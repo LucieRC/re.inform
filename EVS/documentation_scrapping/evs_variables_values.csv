@@ -1,0 +1,28 @@
+var_short,question,value_code,value_label
+A001,Important in life: Family,-5,Missing: Other
+A001,Important in life: Family,-4,Not asked in survey
+A001,Important in life: Family,-3,Not applicable
+A001,Important in life: Family,-2,No answer
+A001,Important in life: Family,-1,Don´t know
+A001,Important in life: Family,1,Very important
+A001,Important in life: Family,2,Rather important
+A001,Important in life: Family,3,Not very important
+A001,Important in life: Family,4,Not at all important
+A002,Important in life: Friends,-5,Missing: Other
+A002,Important in life: Friends,-4,Not asked in survey
+A002,Important in life: Friends,-3,Not applicable
+A002,Important in life: Friends,-2,No answer
+A002,Important in life: Friends,-1,Don´t know
+A002,Important in life: Friends,1,Very important
+A002,Important in life: Friends,2,Rather important
+A002,Important in life: Friends,3,Not very important
+A002,Important in life: Friends,4,Not at all important
+A003,Important in life: Leisure time,-5,Missing: Other
+A003,Important in life: Leisure time,-4,Not asked in survey
+A003,Important in life: Leisure time,-3,Not applicable
+A003,Important in life: Leisure time,-2,No answer
+A003,Important in life: Leisure time,-1,Don´t know
+A003,Important in life: Leisure time,1,Very important
+A003,Important in life: Leisure time,2,Rather important
+A003,Important in life: Leisure time,3,Not very important
+A003,Important in life: Leisure time,4,Not at all important

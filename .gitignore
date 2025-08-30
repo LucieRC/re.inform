@@ -1,2 +1,6 @@
 raw_material/
 website/
+EVS/data/
+EVS/documentation/
+*.pyc
+*.DS_Store
