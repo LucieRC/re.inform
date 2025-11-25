@@ -7,7 +7,7 @@ re.inform is a project aimed at countering the spread of far-right extremism, fa
 Our mission is to better understand what leads certain people to fall for extremist or conspiracist content, and provide effective tools for engagement that can be used by various stakeholders working to combat harmful ideologies.
 
 ## Core features
-- **Personality categorization**: Evidence-based classification of different personality types and their susceptibility to extremist content
+- **Personality categorization**: Evidence-based classification of different personality types and their openness to dialogue
 - **Counter-narrative tools**:
   - Summary sheets for each personality category
   - Interactive chatbot that provides tailored conversation strategies
@@ -45,16 +45,13 @@ Our initial release will include:
 - Community access ([Discord](https://discord.gg/fu5aveEJ))
 - Feedback collection mechanism
 
-## Contributing
+## Contributing/Contact
 We welcome contributions from researchers, developers, content creators, and community organizers. Join our [Discord](https://discord.gg/fu5aveEJ) community to learn more about how you can get involved.
 User feedback is essential to our project's evolution. Share your thoughts and experiences through:
 
 - Our [Discord](https://discord.gg/fu5aveEJ) community
 - Website feedback form
 - Direct engagement with project contributors
-
-## Contact
-Join our [Discord](https://discord.gg/fu5aveEJ) community.
 
 ## License
 [To be determined]
