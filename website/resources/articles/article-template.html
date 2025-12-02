@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[ARTICLE TITLE] - re.inform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/styles.css">
+    <style>
+        /* Article-specific styles */
+        .resource-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 0;
+        }
+        
+        .resource-content h1 {
+            margin-bottom: 1rem;
+        }
+        
+        .resource-content h2 {
+            margin-top: 2rem;
+        }
+        
+        .meta {
+            font-style: italic;
+            color: var(--dark-gray);
+            margin-bottom: 2rem;
+        }
+        
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            gap: 0.5rem;
+        }
+        
+        .resource-tag {
+            display: inline-block;
+            background: var(--light-gray);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .content {
+            line-height: 1.8;
+        }
+        
+        .content p {
+            margin-bottom: 1.5rem;
+        }
+        
+        .content ul, .content ol {
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+        }
+        
+        .content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .references {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--medium-gray);
+            font-size: 0.9rem;
+        }
+        
+        .back-to-resources {
+            display: inline-block;
+            margin: 2rem 0;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="../../index.html">re.inform</a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="../../index.html">Home</a></li>
+                    <li><a href="../../manifesto.html">Manifesto</a></li>
+                    <li><a href="../../resources.html" class="active">Resources</a></li>
+                    <li><a href="../../contribute.html">Contribute</a></li>
+                    <li><a href="../../about.html">About</a></li>
+                    <li><a href="../../feedback.html">Feedback</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="language-selector">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">🇬🇧</option>
+                        <option value="fr">🇫🇷</option>
+                    </select>
+                </div>
+                <div class="discord-button">
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord">Join our Discord</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>Resource</h1>
+                <p class="subtitle">[ARTICLE TITLE]</p>
+            </div>
+        </section>
+
+        <section class="resource-content-section">
+            <div class="container">
+                <a href="../../resources.html" class="back-to-resources">← Back to Resources</a>
+                
+                <div class="resource-content">
+                    <h1>[ARTICLE TITLE]</h1>
+                    <div class="meta">
+                        <span class="author">By [AUTHOR NAME]</span> | 
+                        <span class="date">[PUBLICATION DATE]</span>
+                    </div>
+                    
+                    <div class="tags">
+                        <span class="resource-tag">[TAG 1]</span>
+                        <span class="resource-tag">[TAG 2]</span>
+                        <span class="resource-tag">[TAG 3]</span>
+                    </div>
+                    
+                    <div class="content">
+                        <!-- Article content goes here -->
+                    </div>
+                </div>
+                
+                <a href="../../resources.html" class="back-to-resources">← Back to Resources</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>re.inform</h3>
+                    <p>Building bridges through tailored dialogue.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><a href="../../index.html">Home</a></li>
+                        <li><a href="../../manifesto.html">Manifesto</a></li>
+                        <li><a href="../../resources.html">Resources</a></li>
+                        <li><a href="../../contribute.html">Contribute</a></li>
+                        <li><a href="../../about.html">About</a></li>
+                        <li><a href="../../feedback.html">Feedback</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Connect</h3>
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord-footer">Join our Discord</a>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 re.inform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="feedback-float">
+        <a href="../../feedback.html">Feedback</a>
+    </div>
+
+    <script src="../../js/main.js"></script>
+</body>
+</html>

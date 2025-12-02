@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resources - re.inform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Resource-specific styles */
+        .resource-filter {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .resource-filter button {
+            padding: 0.5rem 1rem;
+            background: var(--light-gray);
+            border: none;
+            border-radius: 4px;
+            font-family: 'Montserrat', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .resource-filter button.active,
+        .resource-filter button:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .resource-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .resource-item {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .resource-tag {
+            display: inline-block;
+            background: var(--light-gray);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .reading-path {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--light-gray);
+            border-radius: 8px;
+        }
+        
+        .reading-path h3 {
+            margin-bottom: 1rem;
+        }
+        
+        .reading-path ol {
+            padding-left: 1.5rem;
+        }
+        
+        .reading-path li {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="index.html">re.inform</a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="manifesto.html">Manifesto</a></li>
+                    <li><a href="resources.html" class="active">Resources</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="about.html">About</a></li>
+                    <li><a href="feedback.html">Feedback</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="language-selector">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">🇬🇧</option>
+                        <option value="fr">🇫🇷</option>
+                    </select>
+                </div>
+                <div class="discord-button">
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord">Join our Discord</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>Resources</h1>
+                <p class="subtitle">Curated materials to understand and counter harmful ideologies</p>
+            </div>
+        </section>
+
+        <section class="resources-content">
+            <div class="container">
+                <div class="resource-filter">
+                    <button class="active" data-filter="all">All Resources</button>
+                    <button data-filter="book">Books</button>
+                    <button data-filter="article">Articles</button>
+                    <button data-filter="project">Projects</button>
+                    <button data-filter="tool">Tools</button>
+                    <button data-filter="research">Research Papers</button>
+                </div>
+
+                <div class="resource-list">
+                    <!-- New resource added for Destin Commun article -->
+                    <div class="resource-item article research">
+                        <h3>The "Destin Commun" Typology</h3>
+                        <p>A framework for understanding different audience segments in France and tailoring communication strategies.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Personality Types</span>
+                            <span class="resource-tag">French Context</span>
+                        </div>
+                        <a href="resources/articles/destin-commun-study.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <!-- Existing resources -->
+                    <div class="resource-item book">
+                        <h3>The Psychology of Extremism</h3>
+                        <p>A comprehensive exploration of the psychological factors that contribute to extremist ideologies.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Personality Types</span>
+                            <span class="resource-tag">Psychology</span>
+                        </div>
+                        <a href="resources/books/psychology-of-extremism.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <div class="resource-item article">
+                        <h3>Effective Counter-Narratives in Practice</h3>
+                        <p>Case studies of successful interventions against online extremism through targeted communication.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Counter-Narratives</span>
+                            <span class="resource-tag">Case Studies</span>
+                        </div>
+                        <a href="resources/articles/effective-counter-narratives.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <div class="resource-item project">
+                        <h3>Digital Macroscope Initiative</h3>
+                        <p>An open-source project mapping relationships between online communities and ideological concepts.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Digital Analysis</span>
+                            <span class="resource-tag">Community Mapping</span>
+                        </div>
+                        <a href="resources/projects/digital-macroscope.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <div class="resource-item research">
+                        <h3>Personality Traits and Susceptibility to Extremism</h3>
+                        <p>Academic research examining correlations between personality types and vulnerability to extremist messaging.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Academic Research</span>
+                            <span class="resource-tag">Personality Types</span>
+                        </div>
+                        <a href="resources/research/personality-traits-extremism.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <div class="resource-item tool">
+                        <h3>Dialogue Framework Tool</h3>
+                        <p>A structured approach to engaging with individuals showing signs of extremist beliefs.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Practical Tools</span>
+                            <span class="resource-tag">Dialogue</span>
+                        </div>
+                        <a href="resources/tools/dialogue-framework.html" class="read-more">View Resource</a>
+                    </div>
+                    
+                    <div class="resource-item article">
+                        <h3>The Role of Social Media in Extremist Recruitment</h3>
+                        <p>Analysis of how online platforms facilitate the spread of extremist ideologies.</p>
+                        <div class="resource-tags">
+                            <span class="resource-tag">Social Media</span>
+                            <span class="resource-tag">Online Extremism</span>
+                        </div>
+                        <a href="resources/articles/social-media-extremism.html" class="read-more">View Resource</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>re.inform</h3>
+                    <p>Building bridges through tailored dialogue.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="manifesto.html">Manifesto</a></li>
+                        <li><a href="resources.html">Resources</a></li>
+                        <li><a href="contribute.html">Contribute</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="feedback.html">Feedback</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Connect</h3>
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord-footer">Join our Discord</a>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 re.inform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="feedback-float">
+        <a href="feedback.html">Feedback</a>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script src="js/resources.js"></script>
+</body>
+</html>

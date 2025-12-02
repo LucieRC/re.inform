@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curated resources - re.inform</title>
+    <meta name="description" content="Browse our curated collection of the most effective counter-narratives, aggregated and refined from the best community contributions.">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <h1>re.inform</h1>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="resources.html" class="active">Resources</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="explore-hero">
+            <div class="container">
+                <h2>Counter-narrative resources</h2>
+                <p>Browse curated resources and community contributions. The most effective counter-narratives are highlighted first, followed by all approved community submissions.</p>
+            </div>
+        </section>
+
+        <section class="explore-content">
+            <div class="container">
+                <div class="explore-controls">
+                    <div class="filter-group">
+                        <label for="tagFilter">Filter by topic:</label>
+                        <select id="tagFilter">
+                            <option value="">All topics</option>
+                        </select>
+                    </div>
+                    <div class="sort-group">
+                        <label for="sortBy">Sort by:</label>
+                        <select id="sortBy">
+                            <option value="rating">Effectiveness rating</option>
+                            <option value="date">Most recent</option>
+                            <option value="title">Title (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="loadingMessage" class="loading-message">Loading resources...</div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+                
+                <!-- Curated Resources Section -->
+                <div class="section-header">
+                    <h3>Curated resources</h3>
+                    <p>Our most effective counter-narratives, backed by research and ranked by effectiveness.</p>
+                </div>
+                <div id="resourcesGrid" class="counter-arguments-grid">
+                    <!-- Resources will be loaded here dynamically -->
+                </div>
+                <div id="emptyResourcesMessage" class="empty-message" style="display: none;">
+                    <p>No curated resources available yet.</p>
+                </div>
+
+                <!-- Community Contributions Section -->
+                <div class="section-header" style="margin-top: 4rem;">
+                    <h3>Community contributions</h3>
+                    <p>All approved counter-narratives submitted by our community members.</p>
+                </div>
+                <div id="contributionsGrid" class="counter-arguments-grid">
+                    <!-- Contributions will be loaded here dynamically -->
+                </div>
+                <div id="emptyContributionsMessage" class="empty-message" style="display: none;">
+                    <p>No community contributions yet. <a href="contribute.html">Be the first to contribute!</a></p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

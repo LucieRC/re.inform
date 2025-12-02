@@ -1,6 +1,7 @@
 raw_material/
-website/
+website1/
 EVS/data/
 EVS/documentation/
 *.pyc
 *.DS_Store
+website2/QUICKSTART.md

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback - re.inform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Feedback form specific styles */
+        .feedback-form {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--medium-gray);
+            border-radius: 4px;
+            font-family: 'PT Serif', serif;
+            font-size: 1rem;
+        }
+        
+        .form-group textarea {
+            min-height: 150px;
+        }
+        
+        .radio-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .radio-option input {
+            width: auto;
+        }
+        
+        .error {
+            border-color: #e74c3c !important;
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+        
+        .success-message {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .previous-feedback {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--light-gray);
+            border-radius: 8px;
+        }
+        
+        .feedback-item {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--medium-gray);
+        }
+        
+        .feedback-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .feedback-meta {
+            font-size: 0.9rem;
+            color: var(--dark-gray);
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="index.html">re.inform</a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="manifesto.html">Manifesto</a></li>
+                    <li><a href="resources.html">Resources</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="about.html">About</a></li>
+                    <li><a href="feedback.html" class="active">Feedback</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="language-selector">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">🇬🇧</option>
+                        <option value="fr">🇫🇷</option>
+                    </select>
+                </div>
+                <div class="discord-button">
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord">Join our Discord</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>Share Your Feedback</h1>
+                <p class="subtitle">Your insights help us improve our tools and approaches</p>
+            </div>
+        </section>
+
+        <section class="feedback-content">
+            <div class="container">
+                <form class="feedback-form">
+                    <div class="form-group">
+                        <label for="user-type">I am a:</label>
+                        <select id="user-type" name="user-type" required>
+                            <option value="">Please select...</option>
+                            <option value="activist">Activist</option>
+                            <option value="educator">Educator</option>
+                            <option value="journalist">Journalist</option>
+                            <option value="friend-family">Friend/Family Member</option>
+                            <option value="researcher">Researcher</option>
+                            <option value="political">Political Leader/Staff</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Which aspects of re.inform have you explored?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="checkbox" id="manifesto" name="explored" value="manifesto">
+                                <label for="manifesto">Manifesto</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="checkbox" id="resources" name="explored" value="resources">
+                                <label for="resources">Resources</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="checkbox" id="discord" name="explored" value="discord">
+                                <label for="discord">Discord Community</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>How would you rate your experience with re.inform?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="excellent" name="rating" value="excellent">
+                                <label for="excellent">Excellent</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="good" name="rating" value="good">
+                                <label for="good">Good</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="fair" name="rating" value="fair">
+                                <label for="fair">Fair</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="poor" name="rating" value="poor">
+                                <label for="poor">Poor</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="feedback">Your feedback and suggestions:</label>
+                        <textarea id="feedback" name="feedback" required placeholder="Please share your thoughts, experiences, and suggestions for improvement..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email (optional):</label>
+                        <input type="email" id="email" name="email" placeholder="Your email if you'd like us to follow up">
+                    </div>
+
+                    <button type="submit" class="button primary">Submit Feedback</button>
+                </form>
+
+                <div class="previous-feedback">
+                    <h2>Previous Feedback Highlights</h2>
+                    <p>Our community has shared these insights:</p>
+                    
+                    <div class="feedback-item">
+                        <div class="feedback-meta">Educator • 2 weeks ago</div>
+                        <p>"The personality categorization framework has been invaluable in helping me approach difficult conversations with students who are showing signs of extremist viewpoints. I've seen genuine moments of reflection that weren't happening before."</p>
+                    </div>
+                    
+                    <div class="feedback-item">
+                        <div class="feedback-meta">Journalist • 1 month ago</div>
+                        <p>"I'd love to see more specific resources for media professionals. The current tools are helpful but could be adapted more specifically for reporting contexts."</p>
+                    </div>
+                    
+                    <div class="feedback-item">
+                        <div class="feedback-meta">Family Member • 3 weeks ago</div>
+                        <p>"After months of increasingly difficult conversations with my brother, the dialogue strategies I found here actually helped us have our first productive discussion about his conspiracy beliefs. There's still a long way to go, but this was the first approach that didn't end in an argument."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>re.inform</h3>
+                    <p>Building bridges through tailored dialogue.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="manifesto.html">Manifesto</a></li>
+                        <li><a href="resources.html">Resources</a></li>
+                        <li><a href="contribute.html">Contribute</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="feedback.html">Feedback</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Connect</h3>
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord-footer">Join our Discord</a>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 re.inform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

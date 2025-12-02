@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - re.inform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .timeline {
+            position: relative;
+            max-width: 800px;
+            margin: 3rem auto;
+            padding: 2rem 0;
+        }
+        
+        .timeline:before {
+            content: '';
+            position: absolute;
+            height: 100%;
+            width: 4px;
+            background: var(--primary-color);
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .timeline-item {
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        
+        .timeline-content {
+            width: 45%;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .timeline-item:nth-child(even) .timeline-content {
+            margin-left: auto;
+        }
+        
+        .timeline-date {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--secondary-color);
+            width: 120px;
+            height: 30px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .methodology-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .method-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .faq-item {
+            margin-bottom: 1.5rem;
+        }
+        
+        .faq-question {
+            font-weight: 600;
+            cursor: pointer;
+            padding: 1rem;
+            background: var(--light-gray);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .faq-question:after {
+            content: '+';
+            position: absolute;
+            right: 1rem;
+            transition: transform 0.3s;
+        }
+        
+        .faq-question.active:after {
+            content: '−';
+        }
+        
+        .faq-answer {
+            padding: 0 1rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .faq-answer.show {
+            max-height: 500px;
+        }
+        
+        @media (max-width: 768px) {
+            .timeline:before {
+                left: 30px;
+            }
+            
+            .timeline-content {
+                width: calc(100% - 60px);
+                margin-left: 60px;
+            }
+            
+            .timeline-item:nth-child(even) .timeline-content {
+                margin-left: 60px;
+            }
+            
+            .timeline-date {
+                left: 30px;
+                transform: translateX(-50%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="index.html">re.inform</a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="manifesto.html">Manifesto</a></li>
+                    <li><a href="resources.html">Resources</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="about.html" class="active">About</a></li>
+                    <li><a href="feedback.html">Feedback</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="language-selector">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">🇬🇧</option>
+                        <option value="fr">🇫🇷</option>
+                    </select>
+                </div>
+                <div class="discord-button">
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord">Join our Discord</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>About re.inform</h1>
+                <p class="subtitle">Our story, methodology, and frequently asked questions</p>
+            </div>
+        </section>
+
+        <section class="about-content">
+            <div class="container">
+                <h2>Project Background</h2>
+                <p>re.inform emerged from the recognition that traditional approaches to countering extremism often fail because they don't account for differences in how people process information and form beliefs. Our project combines insights from psychology, sociology, and communication studies to develop more effective engagement strategies.</p>
+                
+                <h3>Project Timeline</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-date">Initial Concept</div>
+                        <div class="timeline-content">
+                            <h4>Research Phase</h4>
+                            <p>Exploration of existing personality frameworks and their relationship to belief formation and extremism vulnerability</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-date">Development</div>
+                        <div class="timeline-content">
+                            <h4>Methodology Creation</h4>
+                            <p>Development of our personality categorization framework and initial counter-narrative approaches</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-date">Community</div>
+                        <div class="timeline-content">
+                            <h4>Building Connections</h4>
+                            <p>Establishing partnerships with researchers, activists, and educators to refine and test our approaches</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-date">Current</div>
+                        <div class="timeline-content">
+                            <h4>Prototype Development</h4>
+                            <p>Building initial tools and resources for practical application and gathering user feedback</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h2>Our Team</h2>
+                <p>re.inform is a collaborative project bringing together researchers, communicators, and technologists passionate about reducing the influence of harmful ideologies. Our team members include specialists in:</p>
+                <ul>
+                    <li>Social psychology and belief formation</li>
+                    <li>Online community dynamics</li>
+                    <li>Communication strategies</li>
+                    <li>Digital tool development</li>
+                </ul>
+                
+                <h2>Methodology Details</h2>
+                <div class="methodology-details">
+                    <div class="method-card">
+                        <h3>Personality Classification</h3>
+                        <p>We've identified several key personality factors that influence susceptibility to extremist messaging, including:</p>
+                        <ul>
+                            <li>Need for cognitive closure</li>
+                            <li>Tolerance for ambiguity</li>
+                            <li>Trust orientation</li>
+                            <li>Value hierarchies</li>
+                            <li>Identity attachment patterns</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="method-card">
+                        <h3>Digital "Macroscope"</h3>
+                        <p>Our digital analysis maps connections between concepts and communities online, allowing us to:</p>
+                        <ul>
+                            <li>Identify common pathways to radicalization</li>
+                            <li>Understand linguistic patterns that resonate with different groups</li>
+                            <li>Track the evolution of extremist narratives</li>
+                            <li>Find potential intervention points</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="method-card">
+                        <h3>Counter-Narrative Development</h3>
+                        <p>We use an evidence-based process to create engagement strategies:</p>
+                        <ul>
+                            <li>Identify underlying needs and worldviews</li>
+                            <li>Develop framing that addresses those needs</li>
+                            <li>Test with focus groups and digital analysis</li>
+                            <li>Refine based on field feedback</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h2>Frequently Asked Questions</h2>
+                <div class="faq-section">
+                    <div class="faq-item">
+                        <div class="faq-question">Isn't categorizing people problematic?</div>
+                        <div class="faq-answer">
+                            <p>We recognize the ethical concerns around categorization and work to avoid reductive approaches. Our framework is:
+                            <ul>
+                                <li>Descriptive, not prescriptive</li>
+                                <li>Based on tendencies, not fixed traits</li>
+                                <li>Focused on communication needs, not value judgments</li>
+                                <li>Continuously refined through research and feedback</li>
+                            </ul>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">How is this different from manipulation?</div>
+                        <div class="faq-answer">
+                            <p>There's an important ethical distinction between tailoring communication to be more accessible and manipulating people. Our approach:
+                            <ul>
+                                <li>Aims to foster critical thinking, not push specific conclusions</li>
+                                <li>Is transparent about its methods and goals</li>
+                                <li>Respects individual agency</li>
+                                <li>Is grounded in evidence-based psychology</li>
+                            </ul>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">Does this approach work for all types of extremism?</div>
+                        <div class="faq-answer">
+                            <p>While our current focus is primarily on far-right extremism, fascism, racism, and climate denialism, the underlying psychological principles can be applied more broadly. We're continuously expanding our research to encompass different forms of harmful ideologies.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">How can I get involved if I'm not a researcher?</div>
+                        <div class="faq-answer">
+                            <p>There are many ways to contribute! Visit our <a href="contribute.html">Contribute page</a> to learn about opportunities for content creation, testing, providing feedback, and more.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>re.inform</h3>
+                    <p>Building bridges through tailored dialogue.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="manifesto.html">Manifesto</a></li>
+                        <li><a href="resources.html">Resources</a></li>
+                        <li><a href="contribute.html">Contribute</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="feedback.html">Feedback</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Connect</h3>
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord-footer">Join our Discord</a>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 re.inform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="feedback-float">
+        <a href="feedback.html">Feedback</a>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        // FAQ functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const faqQuestions = document.querySelectorAll('.faq-question');
+            
+            faqQuestions.forEach(question => {
+                question.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const answer = this.nextElementSibling;
+                    answer.classList.toggle('show');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

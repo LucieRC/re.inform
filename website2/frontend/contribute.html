@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contribute - re.inform</title>
+    <meta name="description" content="Share your counter-narrative strategies and help build our evidence-based resource library.">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <h1>re.inform</h1>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="contribute.html" class="active">Contribute</a></li>
+                    <li><a href="resources.html">Resources</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="contribute-hero">
+            <div class="container">
+                <h2>Share your counter-narrative</h2>
+                <p>Your insights and experiences are valuable. Help others combat extremist rhetoric by sharing counter-arguments that have worked for you.</p>
+            </div>
+        </section>
+
+        <section class="contribution-form-section">
+            <div class="container">
+                <div class="form-intro">
+                    <h3>Submit a counter-narrative</h3>
+                    <p>Describe the extremist narrative you've encountered and the counter-argument or strategy that effectively addressed it. Include sources when possible to strengthen the evidence base.</p>
+                </div>
+
+                <div class="contribution-layout">
+                    <form id="contributionForm" class="contribution-form">
+                    <div class="form-group">
+                        <label for="narrative">Extremist narrative or claim</label>
+                        <small>Please be specific and factual.</small>
+                        <textarea 
+                            id="narrative" 
+                            name="narrative" 
+                            rows="4" 
+                            placeholder="Describe the extremist narrative, misinformation, or harmful claim you're addressing..."
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="counterArgument">The counter-argument or strategy</label>
+                        <small>Include the reasoning, evidence, or communication strategy that makes this effective.</small>
+                        <textarea 
+                            id="counterArgument" 
+                            name="counterArgument" 
+                            rows="6" 
+                            placeholder="Explain the counter-narrative, evidence, or approach that effectively addresses this claim..."
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="source">Source/reference *</label>
+                        <small>Link to research, articles, or other supporting evidence.</small>
+                        <input 
+                            type="url" 
+                            id="source" 
+                            name="source" 
+                            required
+                            placeholder="https://example.com/research-study"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label>Related tags (optional)</label>
+                        <small>Select all topics that apply to this counter-narrative.</small>
+                        <div class="tags-selection">
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="immigration">
+                                <span>Immigration</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="economy">
+                                <span>Economy</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="climate">
+                                <span>Climate</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="diversity">
+                                <span>Diversity</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="health">
+                                <span>Health</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="education">
+                                <span>Education</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="security">
+                                <span>Security</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="technology">
+                                <span>Technology</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="media">
+                                <span>Media</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="politics">
+                                <span>Politics</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="religion">
+                                <span>Religion</span>
+                            </label>
+                            <label class="tag-checkbox">
+                                <input type="checkbox" name="tags" value="culture">
+                                <span>Culture</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-message" id="formMessage"></div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">Submit contribution</button>
+                        <button type="button" class="btn btn-secondary" id="resetBtn">Clear form</button>
+                    </div>
+                    </form>
+
+                    <div class="contribution-example">
+                        <h4>Example submission</h4>
+                        <div class="example-field">
+                            <strong>Extremist narrative:</strong>
+                            <p>"Immigrants are stealing our jobs and draining public resources"</p>
+                        </div>
+                        <div class="example-field">
+                            <strong>Counter-argument:</strong>
+                            <p>Studies consistently show immigrants create jobs through entrepreneurship and fill critical labor gaps in sectors like healthcare, agriculture, and technology. Research indicates they contribute more in taxes than they receive in benefits, with a net positive economic impact. For example, a 2018 study by the National Academies found that immigrant-founded companies create jobs for millions of native-born workers.</p>
+                        </div>
+                        <div class="example-field">
+                            <strong>Source:</strong>
+                            <p>https://www.nationalacademies.org/news/2016/09/immigration-has-long-term-positive-impact-on-economy</p>
+                        </div>
+                        <div class="example-field">
+                            <strong>Tags:</strong>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                                <span class="example-tag">Immigration</span>
+                                <span class="example-tag">Economy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="contribution-info">
+                    <h3>What happens next?</h3>
+                    <ul>
+                        <li>Your submission will be reviewed by our team</li>
+                        <li>We'll verify sources and assess effectiveness</li>
+                        <li>Approved contributions are added to our public database</li>
+                        <li>High-quality submissions may be featured and expanded upon</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "home": "Home",
+    "manifesto": "Manifesto",
+    "resources": "Resources",
+    "contribute": "Contribute",
+    "about": "About",
+    "feedback": "Feedback"
+  },
+  "header": {
+    "joinDiscord": "Join"
+  },
+  "hero": {
+    "title": "Building bridges through tailored dialogue.",
+    "subtitle": "Countering extremism with evidence-based and collectively discussed communication strategies.",
+    "joinButton": "Join the community",
+    "learnButton": "Learn more"
+  },
+  "problem": {
+    "title": "The challenge we face",
+    "description": "Far-right extremism, fascism, racism, and climate denialism are gaining ground across Europe and beyond. These ideologies spread rapidly online, creating echo chambers that reinforce harmful beliefs."
+  },
+  "approach": {
+    "title": "Our approach",
+    "step1Title": "Personality categorization",
+    "step1Desc": "Understanding different personality types and their susceptibility to extremist content",
+    "step2Title": "Counter-narrative development",
+    "step2Desc": "Creating tailored approaches for each personality type",
+    "step3Title": "Practical tools",
+    "step3Desc": "Summary sheets and interactive guidance for real-world conversations"
+  },
+  "resources": {
+    "title": "Featured resources",
+    "resource1Title": "Understanding personality types",
+    "resource1Desc": "An introduction to psychological profiles and susceptibility to extremist content",
+    "resource2Title": "Effective counter-narratives",
+    "resource2Desc": "Research-backed strategies for engaging with individuals vulnerable to extremism",
+    "resource3Title": "Digital community mapping",
+    "resource3Desc": "Exploring online extremist communities and their conceptual frameworks",
+    "readMore": "Read more"
+  },
+  "cta": {
+    "title": "Join our community",
+    "description": "Help build better dialogue strategies and counter harmful ideologies",
+    "joinButton": "Join our Discord",
+    "feedbackButton": "Share feedback"
+  },
+  "footer": {
+    "tagline": "Building bridges through tailored dialogue.",
+    "pages": "Pages",
+    "connect": "Connect",
+    "copyright": "© 2025 re.inform. All rights reserved."
+  }
+}

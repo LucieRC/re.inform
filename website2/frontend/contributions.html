@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community contributions - re.inform</title>
+    <meta name="description" content="Browse all approved counter-narratives submitted by our community.">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <h1>re.inform</h1>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="contributions.html" class="active">Contributions</a></li>
+                    <li><a href="resources.html">Resources</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="explore-hero">
+            <div class="container">
+                <h2>Community contributions</h2>
+                <p>Browse all approved counter-narratives submitted by our community members. These contributions are reviewed for quality and appear here as soon as they're approved.</p>
+            </div>
+        </section>
+
+        <section class="explore-content">
+            <div class="container">
+                <div class="explore-controls">
+                    <div class="filter-group">
+                        <label for="tagFilter">Filter by topic:</label>
+                        <select id="tagFilter">
+                            <option value="">All topics</option>
+                        </select>
+                    </div>
+                    <div class="sort-group">
+                        <label for="sortBy">Sort by:</label>
+                        <select id="sortBy">
+                            <option value="date">Most recent</option>
+                            <option value="title">Title (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="loadingMessage" class="loading-message">Loading counter-arguments...</div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+                
+                <div id="counterArgumentsGrid" class="counter-arguments-grid">
+                    <!-- Counter-arguments will be loaded here dynamically -->
+                </div>
+
+                <div id="emptyMessage" class="empty-message" style="display: none;">
+                    <p>No contributions found matching your filters.</p>
+                    <a href="contribute.html" class="btn btn-primary">Submit the first one</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

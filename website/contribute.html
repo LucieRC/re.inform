@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contribute - re.inform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .contribute-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .contribute-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .contribute-card h3 {
+            color: var(--primary-color);
+        }
+        
+        .icon-container {
+            width: 60px;
+            height: 60px;
+            background-color: var(--light-gray);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .current-needs {
+            background: var(--light-gray);
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 3rem 0;
+        }
+        
+        .needs-list {
+            margin-top: 1rem;
+        }
+        
+        .needs-list li {
+            margin-bottom: 0.8rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .needs-list li:before {
+            content: "•";
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .contact-form {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--medium-gray);
+            border-radius: 4px;
+            font-family: 'PT Serif', serif;
+            font-size: 1rem;
+        }
+        
+        .form-group textarea {
+            min-height: 150px;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+        
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-header h2 {
+            margin-bottom: 0;
+        }
+        
+        .close-modal {
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--dark-gray);
+            background: none;
+            border: none;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        .close-modal:hover {
+            color: var(--primary-color);
+        }
+        
+        .contribute-card-highlight {
+            border: 2px solid var(--primary-color);
+            background: linear-gradient(135deg, #ffffff 0%, #f0f7f3 100%);
+        }
+        
+        .contribute-card-highlight .button {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="index.html">re.inform</a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="manifesto.html">Manifesto</a></li>
+                    <li><a href="resources.html">Resources</a></li>
+                    <li><a href="contribute.html" class="active">Contribute</a></li>
+                    <li><a href="about.html">About</a></li>
+                    <li><a href="feedback.html">Feedback</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="language-selector">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">🇬🇧</option>
+                        <option value="fr">🇫🇷</option>
+                    </select>
+                </div>
+                <div class="discord-button">
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord">Join our Discord</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>Contribute to re.inform</h1>
+                <p class="subtitle">Join our collaborative effort to counter harmful ideologies</p>
+            </div>
+        </section>
+
+        <section class="contribute-content">
+            <div class="container">
+                <p>re.inform is a community-driven project that relies on diverse contributions. There are many ways to get involved, regardless of your expertise or available time.</p>
+                
+                <div class="contribute-options">
+                    <div class="contribute-card">
+                        <div class="icon-container">🔍</div>
+                        <h3>Research</h3>
+                        <p>Contribute to our understanding of personality types and their openness to dialogue.</p>
+                        <ul>
+                            <li>Literature review and synthesis</li>
+                            <li>Case study documentation</li>
+                            <li>Academic partnerships</li>
+                            <li>Data analysis</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="contribute-card">
+                        <div class="icon-container">💻</div>
+                        <h3>Development</h3>
+                        <p>Help build and improve our digital tools and website.</p>
+                        <ul>
+                            <li>Frontend development</li>
+                            <li>Backend systems</li>
+                            <li>UX/UI design</li>
+                            <li>Machine learning integration</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="contribute-card">
+                        <div class="icon-container">✏️</div>
+                        <h3>Content Creation</h3>
+                        <p>Develop materials that explain complex concepts in accessible ways.</p>
+                        <ul>
+                            <li>Writing summary sheets</li>
+                            <li>Creating visualizations</li>
+                            <li>Developing training materials</li>
+                            <li>Translating resources</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="contribute-card contribute-card-highlight">
+                        <div class="icon-container">💬</div>
+                        <h3>Submit Counter-Narrative</h3>
+                        <p>Share an extremist narrative you've encountered and help us develop effective counter-arguments.</p>
+                        <button class="button primary" onclick="openSubmissionModal()">Submit Content</button>
+                    </div>
+                    
+                    <div class="contribute-card">
+                        <div class="icon-container">🧪</div>
+                        <h3>Testing & Feedback</h3>
+                        <p>Help refine our approaches by applying them and providing insights.</p>
+                        <ul>
+                            <li>User testing of tools</li>
+                            <li>Real-world application</li>
+                            <li>Case documentation</li>
+                            <li>Effectiveness evaluation</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="current-needs">
+                    <h2>Current Project Needs</h2>
+                    <p>These are the specific areas where we're actively seeking contributions:</p>
+                    
+                    <div class="needs-list">
+                        <ul>
+                            <li><strong>UX Designer</strong> to improve the usability of our personality categorization interface</li>
+                            <li><strong>Content Writers</strong> for initial personality profile summary sheets</li>
+                            <li><strong>Subject Matter Experts</strong> on climate change denial narratives</li>
+                            <li><strong>Frontend Developer</strong> familiar with responsive web design</li>
+                            <li><strong>Translators</strong> for French, German, and Spanish resources</li>
+                            <li><strong>Academic Partners</strong> with access to relevant research</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h2>Get In Touch</h2>
+                <p>Interested in contributing? Let us know how you'd like to help:</p>
+                
+                <form class="contact-form">
+                    <div class="form-group">
+                        <label for="name">Name:</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contribution-type">I'm interested in contributing as:</label>
+                        <select id="contribution-type" name="contribution-type" required>
+                            <option value="">Please select...</option>
+                            <option value="researcher">Researcher</option>
+                            <option value="developer">Developer</option>
+                            <option value="content-creator">Content Creator</option>
+                            <option value="tester">Tester/Feedback Provider</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">How would you like to contribute?</label>
+                        <textarea id="message" name="message" required placeholder="Please describe your interest, relevant experience, and how you'd like to help..."></textarea>
+                    </div>
+                    
+                    <button type="submit" class="button primary">Submit</button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>re.inform</h3>
+                    <p>Building bridges through tailored dialogue.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="manifesto.html">Manifesto</a></li>
+                        <li><a href="resources.html">Resources</a></li>
+                        <li><a href="contribute.html">Contribute</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="feedback.html">Feedback</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Connect</h3>
+                    <a href="https://discord.gg/fu5aveEJ" class="button discord-footer">Join our Discord</a>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 re.inform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="feedback-float">
+        <a href="feedback.html">Feedback</a>
+    </div>
+
+    <!-- Content Submission Modal -->
+    <div id="submissionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Submit Counter-Narrative Content</h2>
+                <button class="close-modal" onclick="closeSubmissionModal()">&times;</button>
+            </div>
+            <form id="submission-form" class="contact-form" style="margin: 0; padding: 0; box-shadow: none;">
+                <p style="margin-bottom: 1.5rem; color: var(--dark-gray);">
+                    Help us build a comprehensive database of extremist narratives and effective counter-arguments. Your submission will be reviewed by our community.
+                </p>
+                
+                <div class="form-group">
+                    <label for="narrative">Narrative to Counter*</label>
+                    <textarea 
+                        id="narrative" 
+                        name="narrative" 
+                        required 
+                        placeholder="Describe the extremist narrative or argument you've encountered. Be as specific as possible."
+                        style="min-height: 120px;"
+                    ></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="summary">Summary of Counter-Argument*</label>
+                    <textarea 
+                        id="summary" 
+                        name="summary" 
+                        required 
+                        placeholder="Provide a summary of how to effectively counter this narrative. Include key facts, logical approaches, or psychological insights."
+                        style="min-height: 120px;"
+                    ></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="source">Source Link(s)*</label>
+                    <input 
+                        type="url" 
+                        id="source" 
+                        name="source" 
+                        placeholder="https://example.com/source-of-narrative"
+                    >
+                    <small style="color: var(--dark-gray); font-size: 0.9rem; display: block; margin-top: 0.5rem;">
+                        Link to where you encountered this narrative (if available)
+                    </small>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button type="submit" class="button primary" style="flex: 1;">Submit</button>
+                    <button type="button" class="button secondary" onclick="closeSubmissionModal()" style="flex: 1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        // Modal functions for content submission
+        function openSubmissionModal() {
+            document.getElementById('submissionModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeSubmissionModal() {
+            document.getElementById('submissionModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.getElementById('submission-form').reset();
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('submissionModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSubmissionModal();
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('submission-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                narrative: document.getElementById('narrative').value,
+                summary: document.getElementById('summary').value,
+                source: document.getElementById('source').value
+            };
+            
+            // TODO: Send to backend/database
+            console.log('Submission:', formData);
+            
+            // Show success message
+            alert('Thank you for your submission! Your content will be reviewed by our community and added to our database.');
+            
+            closeSubmissionModal();
+        });
+    </script>
+</body>
+</html>

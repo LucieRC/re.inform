@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - re.inform</title>
+    <meta name="description" content="Admin panel for reviewing counter-narrative submissions.">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <h1>re.inform admin</h1>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="contribute.html">Contribute</a></li>
+                    <li><a href="explore.html">Explore</a></li>
+                    <li><button id="logoutBtn" class="btn btn-secondary" style="display: none;">Logout</button></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="admin-section">
+            <div class="container">
+                <!-- Login Form -->
+                <div class="admin-login">
+                    <h2>Admin login</h2>
+                    <form id="adminLoginForm">
+                        <div class="form-group">
+                            <label for="adminPassword">Password:</label>
+                            <input 
+                                type="password" 
+                                id="adminPassword" 
+                                name="password" 
+                                required
+                                placeholder="Enter admin password"
+                            >
+                        </div>
+                        <div id="loginMessage" class="form-message"></div>
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </form>
+                </div>
+
+                <!-- Admin Content (hidden until logged in) -->
+                <div class="admin-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h2>Review submissions</h2>
+                        <button id="logoutBtn2" class="btn btn-secondary">Logout</button>
+                    </div>
+
+                    <p class="loading-message">Loading submissions...</p>
+
+                    <div id="submissionsList" class="submissions-list">
+                        <!-- Submissions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script>
+        // Additional logout button handler
+        document.getElementById('logoutBtn2')?.addEventListener('click', () => {
+            adminToken = null;
+            sessionStorage.removeItem('adminToken');
+            location.reload();
+        });
+        
+        // Show logout button when logged in
+        if (sessionStorage.getItem('adminToken')) {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) logoutBtn.style.display = 'inline-block';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "manifesto": "Manifeste",
+    "resources": "Ressources",
+    "contribute": "Contribuer",
+    "about": "À propos",
+    "feedback": "Retours"
+  },
+  "header": {
+    "joinDiscord": "Rejoins-nous"
+  },
+  "hero": {
+    "title": "Construire des ponts par le dialogue adapté",
+    "subtitle": "Contrer l'extrémisme avec des stratégies de communication fondées sur des preuves",
+    "joinButton": "Rejoindre notre communauté",
+    "learnButton": "En savoir plus"
+  },
+  "problem": {
+    "title": "Le défi auquel nous sommes confrontés",
+    "description": "L'extrême droite, le fascisme, le racisme et le climatoscepticisme gagnent du terrain en Europe et au-delà. Ces idéologies se propagent rapidement en ligne, créant des chambres d'écho qui renforcent les croyances néfastes."
+  },
+  "approach": {
+    "title": "Notre approche",
+    "step1Title": "Catégorisation des personnalités",
+    "step1Desc": "Comprendre les différents types de personnalité et leur susceptibilité au contenu extrémiste",
+    "step2Title": "Développement de contre-discours",
+    "step2Desc": "Créer des approches sur mesure pour chaque type de personnalité",
+    "step3Title": "Outils pratiques",
+    "step3Desc": "Fiches de synthèse et conseils interactifs pour les conversations réelles"
+  },
+  "resources": {
+    "title": "Ressources en vedette",
+    "resource1Title": "Comprendre les types de personnalité",
+    "resource1Desc": "Une introduction aux profils psychologiques et à la susceptibilité au contenu extrémiste",
+    "resource2Title": "Contre-discours efficaces",
+    "resource2Desc": "Stratégies fondées sur la recherche pour interagir avec des individus vulnérables à l'extrémisme",
+    "resource3Title": "Cartographie des communautés en ligne",
+    "resource3Desc": "Explorer les communautés extrémistes en ligne et leurs cadres conceptuels",
+    "readMore": "Lire plus"
+  },
+  "cta": {
+    "title": "Rejoignez notre communauté",
+    "description": "Aidez à construire de meilleures stratégies de dialogue et à contrer les idéologies néfastes",
+    "joinButton": "Rejoindre Discord",
+    "feedbackButton": "Partager un retour"
+  },
+  "footer": {
+    "tagline": "Construire des ponts par le dialogue adapté",
+    "pages": "Pages",
+    "connect": "Connexion",
+    "copyright": "© 2023 re.inform. Tous droits réservés."
+  }
+}
