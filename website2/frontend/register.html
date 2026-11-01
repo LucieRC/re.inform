@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - re.inform</title>
+    <meta name="description" content="Create your re.inform account">
+    <script src="js/theme.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/onboarding.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <a href="index.html"><h1>re.inform</h1></a>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links" id="navLinks">
+                    <li><a href="index.html">Claims</a></li>
+                    <li><a href="personalities.html">Personas</a></li>
+                    <li><a href="library.html">Library</a></li>
+                    <li><a href="resources.html">Articles</a></li>
+                    <li><a href="contribute.html" class="nav-cta">Contribute</a></li>
+                    <li class="auth-links" id="authLinks"></li>
+                    <li class="theme-toggle" aria-label="Color scheme">
+                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="contribute-hero">
+            <div class="container">
+                <h2>Create your account</h2>
+                <p>Join re.inform to build your reputation, track contributions, and help combat extremist narratives.</p>
+            </div>
+        </section>
+
+        <section class="contribution-form-section">
+            <div class="container">
+                <form id="registerForm" class="contribution-form" style="max-width: 500px;">
+                    <div class="form-group">
+                        <label for="username">Username *</label>
+                        <small>At least 3 characters. This will be publicly visible.</small>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            required
+                            minlength="3"
+                            placeholder="Choose a username"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <small>Your email will not be publicly visible.</small>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required
+                            placeholder="your.email@example.com"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <small>At least 6 characters.</small>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required
+                            minlength="6"
+                            placeholder="Choose a secure password"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm password *</label>
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            name="confirmPassword" 
+                            required
+                            minlength="6"
+                            placeholder="Re-enter your password"
+                        >
+                    </div>
+
+                    <div class="form-message" id="formMessage"></div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="registerBtn">Create account</button>
+                    </div>
+
+                    <p style="text-align: center; margin-top: 1rem;">
+                        Already have an account? <a href="login.html">Login here</a>
+                    </p>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

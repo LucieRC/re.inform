@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - re.inform</title>
+    <meta name="description" content="View your re.inform profile and contributions">
+    <script src="js/theme.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/onboarding.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <a href="index.html"><h1>re.inform</h1></a>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links" id="navLinks">
+                    <li><a href="index.html">Claims</a></li>
+                    <li><a href="personalities.html">Personas</a></li>
+                    <li><a href="library.html">Library</a></li>
+                    <li><a href="resources.html">Articles</a></li>
+                    <li><a href="contribute.html" class="nav-cta">Contribute</a></li>
+                    <li class="auth-links" id="authLinks"></li>
+                    <li class="theme-toggle" aria-label="Color scheme">
+                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="explore-content">
+            <div class="container">
+                <div class="profile-layout">
+                    <!-- Left Column: user name + basic data -->
+                    <aside class="profile-sidebar">
+                        <div class="profile-header">
+                            <!-- Profile picture: shown for everyone, uploadable on your own -->
+                            <div class="profile-avatar" id="profileAvatarBlock">
+                                <span class="avatar avatar-lg" id="profileAvatar" aria-hidden="true">
+                                    <span class="avatar-initials"></span>
+                                </span>
+                                <div class="profile-avatar-actions" id="avatarActions" style="display: none;">
+                                    <button id="changeAvatarBtn" type="button" class="btn btn-secondary btn-small">Change photo</button>
+                                    <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                                    <p id="avatarError" class="error-message" role="alert" style="display: none;"></p>
+                                </div>
+                            </div>
+                            <div class="profile-info">
+                                <h2 id="profileUsername">Loading...</h2>
+                                <span id="profileRole" class="role-badge">Member</span>
+                            </div>
+                            <!-- Follow button - only shown on other users' profiles -->
+                            <div id="followButtonContainer" style="display: none;">
+                                <button id="followButton" type="button" class="btn btn-primary follow-btn">
+                                    Follow
+                                </button>
+                            </div>
+                        </div>
+
+                        <p id="profileMemberSince" class="member-since"></p>
+
+                        <!-- Level bar: reputation as visible progression (own profile only) -->
+                        <div id="levelBar" class="level-bar" style="display: none;">
+                            <div class="level-bar-head">
+                                <span class="level-name" id="levelName">Observer</span>
+                                <span class="level-next" id="levelNext"></span>
+                            </div>
+                            <div class="level-track" role="progressbar" id="levelProgress"
+                                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                                 aria-label="Progress to next level">
+                                <span class="level-fill" id="levelFill"></span>
+                            </div>
+                        </div>
+
+                        <dl class="profile-stats">
+                            <div class="stat-card">
+                                <dd class="stat-n" id="reputationScore">0</dd>
+                                <dt>Reputation</dt>
+                            </div>
+                            <div class="stat-card">
+                                <dd class="stat-n" id="contributionCount">0</dd>
+                                <dt>Contributions</dt>
+                            </div>
+                            <div class="stat-card">
+                                <dd class="stat-n" id="followingCount">0</dd>
+                                <dt>Following</dt>
+                            </div>
+                            <div class="stat-card">
+                                <dd class="stat-n" id="followersCount">0</dd>
+                                <dt>Followers</dt>
+                            </div>
+                        </dl>
+
+                        <!-- Your choices live in the rail: topics and people you follow -->
+                        <div id="tagsFollowingSection" class="profile-rail-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Tags you're following</h3>
+                            </div>
+                            <div id="followedTagsList" class="followed-tags-list">
+                                <div class="followed-tags-toolbar">
+                                    <button id="addTagsBtn" type="button" class="btn btn-secondary btn-small">+ Add tags</button>
+                                </div>
+                                <div id="followedTagsContent" class="followed-tags-content">
+                                    <p class="empty-message">You're not following any tags yet.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="followingSection" class="profile-rail-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Profiles you're following</h3>
+                            </div>
+                            <div id="followingList" class="following-grid">
+                                <p class="empty-message">You're not following anyone yet.</p>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Right Column: the rest -->
+                    <div class="profile-main">
+                        <!-- Recommended for you (own profile only) -->
+                        <div id="recommendationsSection" class="profile-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Recommended for you</h3>
+                                <p>Claims worth answering, matched to the topics you follow.</p>
+                            </div>
+                            <div id="recommendationsContent" class="needs-help-grid" aria-live="polite">
+                                <div class="loading-message">Finding claims for you…</div>
+                            </div>
+                        </div>
+
+                        <!-- Activity from people you follow (own profile only) -->
+                        <div id="followingActivitySection" class="profile-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>From people you follow</h3>
+                            </div>
+                            <div id="followingActivityContent" class="activity-feed" aria-live="polite">
+                                <div class="loading-message">Loading recent activity…</div>
+                            </div>
+                        </div>
+
+                        <!-- Contribution status tracker (own profile only) -->
+                        <div id="statusTrackerSection" class="profile-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Your submissions</h3>
+                                <p>Track what you've sent in as it moves through review.</p>
+                            </div>
+                            <div id="statusTrackerContent" class="status-tracker" aria-live="polite">
+                                <div class="loading-message">Loading your submissions…</div>
+                            </div>
+                        </div>
+
+                        <!-- Endorsements Section -->
+                        <div class="profile-section">
+                            <div class="section-header">
+                                <h3>Endorsements received</h3>
+                            </div>
+                            <div id="endorsementsList" class="endorsements-list">
+                                <div class="loading-message">Loading endorsements...</div>
+                            </div>
+                        </div>
+
+                        <!-- Contributions Section -->
+                        <div class="profile-section">
+                            <div class="section-header">
+                                <h3 id="contributionsTitle">Contributions</h3>
+                            </div>
+                            <div id="contributionsList" class="counter-arguments-grid">
+                                <div class="loading-message">Loading contributions...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Tag Selector Modal -->
+    <div id="tagSelectorModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="tagSelectorTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="tagSelectorTitle">Select tags to follow</h3>
+                <button class="modal-close" type="button" data-close-tag-selector aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="tagSelectorGrid" class="tag-selector-grid">
+                    <!-- Tags will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-close-tag-selector>Done</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

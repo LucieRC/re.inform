@@ -3,26 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contribute - re.inform</title>
-    <meta name="description" content="Share your counter-narrative strategies and help build our evidence-based resource library.">
+    <title>Get involved - re.inform</title>
+    <meta name="description" content="Pick what describes you and start helping in a few minutes: vote, answer a claim, share a source, design, or code.">
+    <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/onboarding.css">
 </head>
 <body>
     <header>
         <div class="container">
             <nav>
                 <div class="logo">
-                    <h1>re.inform</h1>
+                    <a href="index.html"><h1>re.inform</h1></a>
                 </div>
                 <button class="mobile-menu-toggle" aria-label="Toggle menu">
                     <span></span>
                     <span></span>
                     <span></span>
                 </button>
-                <ul class="nav-links">
-                    <li><a href="index.html">Home</a></li>
-                    <li><a href="contribute.html" class="active">Contribute</a></li>
-                    <li><a href="resources.html">Resources</a></li>
+                <ul class="nav-links" id="navLinks">
+                    <li><a href="index.html">Claims</a></li>
+                    <li><a href="personalities.html">Personas</a></li>
+                    <li><a href="library.html">Library</a></li>
+                    <li><a href="resources.html">Articles</a></li>
+                    <li><a href="contribute.html" class="nav-cta active" aria-current="page">Contribute</a></li>
+                    <li class="auth-links" id="authLinks"></li>
+                    <li class="theme-toggle" aria-label="Color scheme">
+                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </li>
                 </ul>
             </nav>
         </div>
@@ -31,150 +57,99 @@
     <main>
         <section class="contribute-hero">
             <div class="container">
-                <h2>Share your counter-narrative</h2>
-                <p>Your insights and experiences are valuable. Help others combat extremist rhetoric by sharing counter-arguments that have worked for you.</p>
+                <span class="hero-eyebrow">Get involved</span>
+                <h2>Help in the way that suits you</h2>
+                <p>No expertise needed. Tell us what describes you and we'll show you what you can do right now — most tasks take a few minutes.</p>
             </div>
         </section>
 
-        <section class="contribution-form-section">
-            <div class="container">
-                <div class="form-intro">
-                    <h3>Submit a counter-narrative</h3>
-                    <p>Describe the extremist narrative you've encountered and the counter-argument or strategy that effectively addressed it. Include sources when possible to strengthen the evidence base.</p>
+        <section class="explore-content">
+            <div class="container container-narrow">
+
+                <div id="accountNotice" class="onb-account" hidden>
+                    <p><strong>Most tasks need a free account.</strong> It takes 30 seconds, and you'll come straight back here.</p>
+                    <div class="onb-account-actions">
+                        <a class="btn btn-primary" data-auth="register.html" href="register.html">Create an account</a>
+                        <a data-auth="login.html" href="login.html">I already have one</a>
+                    </div>
                 </div>
 
-                <div class="contribution-layout">
-                    <form id="contributionForm" class="contribution-form">
-                    <div class="form-group">
-                        <label for="narrative">Extremist narrative or claim</label>
-                        <small>Please be specific and factual.</small>
-                        <textarea 
-                            id="narrative" 
-                            name="narrative" 
-                            rows="4" 
-                            placeholder="Describe the extremist narrative, misinformation, or harmful claim you're addressing..."
-                        ></textarea>
-                    </div>
+                <h3 class="onb-step"><span class="onb-step-n" aria-hidden="true">1</span> What describes you best?</h3>
+                <div id="profilePicker" class="onb-profiles" role="group" aria-label="What describes you best?"></div>
 
-                    <div class="form-group">
-                        <label for="counterArgument">The counter-argument or strategy</label>
-                        <small>Include the reasoning, evidence, or communication strategy that makes this effective.</small>
-                        <textarea 
-                            id="counterArgument" 
-                            name="counterArgument" 
-                            rows="6" 
-                            placeholder="Explain the counter-narrative, evidence, or approach that effectively addresses this claim..."
-                        ></textarea>
-                    </div>
+                <div id="taskSection" hidden>
+                    <h3 class="onb-step" id="taskHeading"><span class="onb-step-n" aria-hidden="true">2</span> Pick something to do</h3>
+                    <div id="taskList" class="help-paths"></div>
+                </div>
 
-                    <div class="form-group">
-                        <label for="source">Source/reference *</label>
-                        <small>Link to research, articles, or other supporting evidence.</small>
-                        <input 
-                            type="url" 
-                            id="source" 
-                            name="source" 
-                            required
-                            placeholder="https://example.com/research-study"
-                        >
+                <!-- Workspaces: each one is opened by a task above. -->
+                <section id="ws-prioritize" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-prioritize-title">
+                    <h3 id="ws-prioritize-title">Which claims do you hear most often?</h3>
+                    <p>One tap per claim. The most-voted claims are answered first.</p>
+                    <div class="onb-login-hint"></div>
+                    <div id="priorityMessage" class="form-message" role="status"></div>
+                    <div id="priorityList" class="priority-list">
+                        <div class="loading-message">Loading claims…</div>
                     </div>
+                </section>
 
-                    <div class="form-group">
-                        <label>Related tags (optional)</label>
-                        <small>Select all topics that apply to this counter-narrative.</small>
-                        <div class="tags-selection">
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="immigration">
-                                <span>Immigration</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="economy">
-                                <span>Economy</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="climate">
-                                <span>Climate</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="diversity">
-                                <span>Diversity</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="health">
-                                <span>Health</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="education">
-                                <span>Education</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="security">
-                                <span>Security</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="technology">
-                                <span>Technology</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="media">
-                                <span>Media</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="politics">
-                                <span>Politics</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="religion">
-                                <span>Religion</span>
-                            </label>
-                            <label class="tag-checkbox">
-                                <input type="checkbox" name="tags" value="culture">
-                                <span>Culture</span>
-                            </label>
+                <section id="ws-answer" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-answer-title">
+                    <h3 id="ws-answer-title">Claims waiting for an answer</h3>
+                    <p>Each claim needs an answer for each kind of person. Pick an open spot: you'll see tips about that person while you write. A few sentences are enough.</p>
+                    <div class="onb-login-hint"></div>
+                    <div id="needsHelp" class="needs-help-grid">
+                        <div class="loading-message">Loading claims…</div>
+                    </div>
+                </section>
+
+                <section id="ws-claim" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-claim-title">
+                    <h3 id="ws-claim-title">Add a claim you've heard</h3>
+                    <p>At a family dinner, online, on TV… Write it the way people say it. You don't need a source or an answer: others will help with that.</p>
+                    <div class="onb-login-hint"></div>
+                    <form id="claimForm" class="contribution-form">
+                        <div class="form-group">
+                            <label for="claimText">What did you hear?</label>
+                            <textarea id="claimText" name="claimText" rows="3" required
+                                placeholder="e.g. « Le climat a toujours changé, c'est naturel »"></textarea>
                         </div>
-                    </div>
-
-                    <div class="form-message" id="formMessage"></div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" id="submitBtn">Submit contribution</button>
-                        <button type="button" class="btn btn-secondary" id="resetBtn">Clear form</button>
-                    </div>
+                        <div class="form-message" id="claimFormMessage" role="status"></div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="claimSubmitBtn">Add this claim</button>
+                        </div>
                     </form>
+                </section>
 
-                    <div class="contribution-example">
-                        <h4>Example submission</h4>
-                        <div class="example-field">
-                            <strong>Extremist narrative:</strong>
-                            <p>"Immigrants are stealing our jobs and draining public resources"</p>
+                <section id="ws-resource" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-resource-title">
+                    <h3 id="ws-resource-title">Share a source or a visual</h3>
+                    <p>A study, article, report, chart or infographic that helps answer a claim. Once it's in the library, anyone writing an answer can cite it.</p>
+                    <div class="onb-login-hint"></div>
+                    <form id="resourceForm" class="contribution-form resource-form">
+                        <div class="form-group">
+                            <label for="resourceUrl">Link</label>
+                            <input type="url" id="resourceUrl" name="resourceUrl" required placeholder="https://example.com/study">
                         </div>
-                        <div class="example-field">
-                            <strong>Counter-argument:</strong>
-                            <p>Studies consistently show immigrants create jobs through entrepreneurship and fill critical labor gaps in sectors like healthcare, agriculture, and technology. Research indicates they contribute more in taxes than they receive in benefits, with a net positive economic impact. For example, a 2018 study by the National Academies found that immigrant-founded companies create jobs for millions of native-born workers.</p>
+                        <div class="form-group">
+                            <label for="resourceTitle">Title <span class="onb-optional">(optional)</span></label>
+                            <input type="text" id="resourceTitle" name="resourceTitle" placeholder="IPCC AR6 Synthesis Report">
                         </div>
-                        <div class="example-field">
-                            <strong>Source:</strong>
-                            <p>https://www.nationalacademies.org/news/2016/09/immigration-has-long-term-positive-impact-on-economy</p>
+                        <div class="form-group">
+                            <label for="resourceDescription">Why it's useful <span class="onb-optional">(optional)</span></label>
+                            <textarea id="resourceDescription" name="resourceDescription" rows="2"
+                                placeholder="What it shows, and when to reach for it."></textarea>
                         </div>
-                        <div class="example-field">
-                            <strong>Tags:</strong>
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                                <span class="example-tag">Immigration</span>
-                                <span class="example-tag">Economy</span>
-                            </div>
+                        <div class="form-group">
+                            <label for="resourceArgument">Related claim <span class="onb-optional">(optional)</span></label>
+                            <select id="resourceArgument" name="resourceArgument">
+                                <option value="">Not tied to a specific claim</option>
+                            </select>
                         </div>
-                    </div>
-                </div>
+                        <div class="form-message" id="resourceFormMessage" role="status"></div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="resourceSubmitBtn">Share it</button>
+                        </div>
+                    </form>
+                </section>
 
-                <div class="contribution-info">
-                    <h3>What happens next?</h3>
-                    <ul>
-                        <li>Your submission will be reviewed by our team</li>
-                        <li>We'll verify sources and assess effectiveness</li>
-                        <li>Approved contributions are added to our public database</li>
-                        <li>High-quality submissions may be featured and expanded upon</li>
-                    </ul>
-                </div>
             </div>
         </section>
     </main>

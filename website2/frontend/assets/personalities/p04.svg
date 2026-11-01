@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g transform="translate(0 -5)"><path d="M12 4l6 2.5v5c0 4-6 7-6 7s-6-3-6-7V6.5l6-2.5z" stroke="#8A5A2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11l1.5 1.5 3-3" stroke="#8A5A2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><!-- Scaled-down main path --><!-- <path d="M12 6l4 1.6667v3.3333c0 2.6667-4 4.6667-4 4.6667s-4-2-4-4.6667V8.1667l4-1.6667z"
+          stroke="#8A5A2B"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    Scaled-down inner path
+    <path d="M11 12.3333l1 1 2-2"
+          stroke="#8A5A2B"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"/> --></g><path d="M1 23 A 8 8 0 0 1 23 23" transform="translate(0 3)" stroke="#8A5A2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

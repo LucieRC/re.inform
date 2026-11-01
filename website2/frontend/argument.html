@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narrative - re.inform</title>
+    <meta name="description" content="Responses to a narrative, tailored to who you're talking to.">
+    <script src="js/theme.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/onboarding.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <a href="index.html"><h1>re.inform</h1></a>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-links" id="navLinks">
+                    <li><a href="index.html" class="active">Claims</a></li>
+                    <li><a href="personalities.html">Personas</a></li>
+                    <li><a href="library.html">Library</a></li>
+                    <li><a href="resources.html">Articles</a></li>
+                    <li><a href="contribute.html" class="nav-cta">Contribute</a></li>
+                    <li class="auth-links" id="authLinks"></li>
+                    <li class="theme-toggle" aria-label="Color scheme">
+                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="article-hero">
+            <div class="container">
+                <div class="article-breadcrumb">
+                    <a href="index.html">← Back to the feed</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="explore-content">
+            <div class="container">
+                <div id="argLoading" class="loading-message">Loading narrative…</div>
+                <div id="argError" class="error-message" style="display: none;"></div>
+
+                <div id="argDetail" style="display: none;">
+                    <div class="narrative-header">
+                        <span class="narrative-label">Narrative heard</span>
+                        <h2 id="narrativeText"></h2>
+                        <div id="narrativeTags" class="card-tags"></div>
+                        <div id="seenWith" class="seen-with"></div>
+                    </div>
+
+                    <div class="responses-toolbar">
+                        <h3 id="responsesHeading">Responses</h3>
+                        <div class="filter-group">
+                            <label for="responsePersonaFilter">For whom:</label>
+                            <select id="responsePersonaFilter">
+                                <option value="">Anyone</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="responsesList" class="responses-list"></div>
+
+                    <div id="gapsSection" class="gaps-section" style="display: none;">
+                        <h4>Profiles without a tailored response yet</h4>
+                        <p class="gaps-hint">Know how to reach one of them? Write the first response — it's the most useful thing you can do here.</p>
+                        <div id="gapsList" class="gaps-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Response composer (opens inline / as a sheet) -->
+    <div id="composerBackdrop" class="composer-backdrop" style="display: none;"></div>
+    <aside id="composerPanel" class="composer-panel" style="display: none;" aria-hidden="true" role="dialog" aria-label="Write a response">
+        <div class="composer-header">
+            <h3 id="composerTitle">Write a response</h3>
+            <button type="button" class="modal-close" id="composerClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="composer-body">
+            <p id="composerHint" class="composer-hint"></p>
+            <form id="composerForm">
+                <div class="form-group">
+                    <label for="composerPersona">Who are you answering? <span class="required-mark">*</span></label>
+                    <small>Every response is tailored to one personality.</small>
+                    <select id="composerPersona" required>
+                        <option value="" disabled selected>Choose a personality…</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="composerText">Your response</label>
+                    <textarea id="composerText" rows="6" placeholder="Write a response that would land with this person…"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Sources (evidence)</label>
+                    <small>Add one or more links that back up this response.</small>
+                    <div id="composerSources" class="composer-sources">
+                        <input type="url" class="composer-source-input" placeholder="https://example.com/evidence">
+                    </div>
+                    <button type="button" id="composerAddSource" class="link-btn">+ Add another source</button>
+                </div>
+                <div class="form-message" id="composerMessage"></div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="composerSubmit">Publish for review</button>
+                    <button type="button" class="btn btn-secondary" id="composerCancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </aside>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
