@@ -1,165 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get involved - re.inform</title>
-    <meta name="description" content="Pick what describes you and start helping in a few minutes: vote, answer a claim, share a source, design, or code.">
-    <script src="js/theme.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/onboarding.css">
+    <title data-i18n="common.redirecting">Redirection…</title>
+    <!-- The contribute onboarding moved: tasks are the home page's « Aider » mode,
+         the "what describes you" picker is in the member's profile. -->
+    <meta http-equiv="refresh" content="0; url=index.html?mode=help">
+    <meta name="description" content="Redirection vers « Aider »." data-i18n-content="common.redirectHelp">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <nav>
-                <div class="logo">
-                    <a href="index.html"><h1>re.inform</h1></a>
-                </div>
-                <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <ul class="nav-links" id="navLinks">
-                    <li><a href="index.html">Claims</a></li>
-                    <li><a href="personalities.html">Personas</a></li>
-                    <li><a href="library.html">Library</a></li>
-                    <li><a href="resources.html">Articles</a></li>
-                    <li><a href="contribute.html" class="nav-cta active" aria-current="page">Contribute</a></li>
-                    <li class="auth-links" id="authLinks"></li>
-                    <li class="theme-toggle" aria-label="Color scheme">
-                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-    </header>
-
     <main>
-        <section class="contribute-hero">
-            <div class="container">
-                <span class="hero-eyebrow">Get involved</span>
-                <h2>Help in the way that suits you</h2>
-                <p>No expertise needed. Tell us what describes you and we'll show you what you can do right now — most tasks take a few minutes.</p>
-            </div>
-        </section>
-
-        <section class="explore-content">
-            <div class="container container-narrow">
-
-                <div id="accountNotice" class="onb-account" hidden>
-                    <p><strong>You can vote right away, no account needed.</strong> To write or share, you'll need a free account: it takes 30 seconds, and you'll come straight back here.</p>
-                    <div class="onb-account-actions">
-                        <a class="btn btn-primary" data-auth="register.html" href="register.html">Create an account</a>
-                        <a data-auth="login.html" href="login.html">I already have one</a>
-                    </div>
-                </div>
-
-                <h3 class="onb-step"><span class="onb-step-n" aria-hidden="true">1</span> What describes you best?</h3>
-                <div id="profilePicker" class="onb-profiles" role="group" aria-label="What describes you best?"></div>
-
-                <div id="taskSection" hidden>
-                    <h3 class="onb-step" id="taskHeading"><span class="onb-step-n" aria-hidden="true">2</span> Pick something to do</h3>
-                    <div id="taskList" class="help-paths"></div>
-                </div>
-
-                <!-- Workspaces: each one is opened by a task above. -->
-                <section id="ws-prioritize" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-prioritize-title">
-                    <h3 id="ws-prioritize-title">Which claims do you hear most often?</h3>
-                    <p>One tap per claim. The most-voted claims are answered first.</p>
-                    <div class="onb-login-hint"></div>
-                    <div id="priorityMessage" class="form-message" role="status"></div>
-                    <div id="priorityList" class="priority-list">
-                        <div class="loading-message">Loading claims…</div>
-                    </div>
-                </section>
-
-                <section id="ws-answer" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-answer-title">
-                    <h3 id="ws-answer-title">Claims waiting for an answer</h3>
-                    <p>Each claim needs an answer for each kind of person. Pick an open spot: you'll see tips about that person while you write. A few sentences are enough.</p>
-                    <div class="onb-login-hint"></div>
-                    <div id="needsHelp" class="needs-help-grid">
-                        <div class="loading-message">Loading claims…</div>
-                    </div>
-                </section>
-
-                <section id="ws-claim" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-claim-title">
-                    <h3 id="ws-claim-title">Add a claim you've heard</h3>
-                    <p>At a family dinner, online, on TV… Write it the way people say it. You don't need a source or an answer: others will help with that.</p>
-                    <div class="onb-login-hint"></div>
-                    <form id="claimForm" class="contribution-form">
-                        <div class="form-group">
-                            <label for="claimText">What did you hear?</label>
-                            <textarea id="claimText" name="claimText" rows="3" required
-                                placeholder="e.g. « Le climat a toujours changé, c'est naturel »"></textarea>
-                        </div>
-                        <div class="form-message" id="claimFormMessage" role="status"></div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" id="claimSubmitBtn">Add this claim</button>
-                        </div>
-                    </form>
-                </section>
-
-                <section id="ws-resource" class="onb-workspace" hidden tabindex="-1" aria-labelledby="ws-resource-title">
-                    <h3 id="ws-resource-title">Share a source or a visual</h3>
-                    <p>A study, article, report, chart or infographic that helps answer a claim. Once it's in the library, anyone writing an answer can cite it.</p>
-                    <div class="onb-login-hint"></div>
-                    <form id="resourceForm" class="contribution-form resource-form">
-                        <div class="form-group">
-                            <label for="resourceUrl">Link</label>
-                            <input type="url" id="resourceUrl" name="resourceUrl" required placeholder="https://example.com/study">
-                        </div>
-                        <div class="form-group">
-                            <label for="resourceTitle">Title <span class="onb-optional">(optional)</span></label>
-                            <input type="text" id="resourceTitle" name="resourceTitle" placeholder="IPCC AR6 Synthesis Report">
-                        </div>
-                        <div class="form-group">
-                            <label for="resourceDescription">Why it's useful <span class="onb-optional">(optional)</span></label>
-                            <textarea id="resourceDescription" name="resourceDescription" rows="2"
-                                placeholder="What it shows, and when to reach for it."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="resourceArgument">Related claim <span class="onb-optional">(optional)</span></label>
-                            <select id="resourceArgument" name="resourceArgument">
-                                <option value="">Not tied to a specific claim</option>
-                            </select>
-                        </div>
-                        <div class="form-message" id="resourceFormMessage" role="status"></div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" id="resourceSubmitBtn">Share it</button>
-                        </div>
-                    </form>
-                </section>
-
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+        <div class="container" style="padding: 2rem 0;">
+            <p data-i18n-html="common.redirectHelpHtml">Redirection vers <a href="index.html?mode=help">« Aider »</a>…</p>
         </div>
-    </footer>
-
-    <script src="js/main.js"></script>
+    </main>
 </body>
 </html>

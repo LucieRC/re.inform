@@ -171,7 +171,7 @@
 
         if (!requestedSrc) {
             loadingEl.style.display = 'none';
-            errorEl.textContent = 'Missing or invalid article source.';
+            errorEl.textContent = t('article.invalid');
             errorEl.style.display = 'block';
             return;
         }
@@ -187,10 +187,10 @@
 
             if (firstHeading) {
                 titleEl.textContent = firstHeading;
-                document.title = `${firstHeading} - re.inform`;
+                document.title = t('site.pageTitle', { page: firstHeading });
             }
 
-            metaEl.innerHTML = `Source: <a href="${requestedSrc}" target="_blank" rel="noopener noreferrer">raw markdown</a>`;
+            metaEl.innerHTML = t('article.sourceHtml', { href: escapeHtml(requestedSrc) });
             metaEl.style.display = 'block';
 
             const markdownForBody = firstHeading ? stripFirstH1(markdown) : markdown;
@@ -200,7 +200,7 @@
             bodyEl.style.display = 'block';
         } catch (e) {
             loadingEl.style.display = 'none';
-            errorEl.textContent = 'Failed to load article. Please try again later.';
+            errorEl.textContent = t('article.loadError');
             errorEl.style.display = 'block';
             console.error(e);
         }

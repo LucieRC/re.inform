@@ -1,0 +1,884 @@
+/* ========================================
+   re.inform — UI layer (2026 refresh, "soft cards")
+   Loaded after styles.css on every page. Redefines the design tokens (the old
+   token names are remapped so existing components follow along), and styles
+   the new header, footer, buttons and the home feed.
+   ======================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --bg: #f4f5f2;            /* page */
+    --card: #ffffff;          /* cards, inputs on focus */
+    --text: #18201b;
+    --muted: #6b746e;
+    --line: #e4e7e2;
+    --line-strong: #d3d7d1;
+    --tint: #e9ebe6;          /* hover fills, subtle chips */
+    --brand: #29683e;         /* green as text / borders */
+    --brand-fill: #29683e;    /* green as a background behind white text */
+    --brand-soft: #e3efe6;    /* "How to answer" box */
+    --gold: #d6b969;
+    --shadow: 0 1px 2px rgba(20, 30, 25, .04), 0 4px 16px rgba(20, 30, 25, .04);
+    --shadow-hover: 0 8px 28px rgba(20, 30, 25, .08);
+    --radius: 16px;
+    --radius-sm: 12px;
+    --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --page-max: 1120px;
+    --gutter: 24px;
+
+    /* Legacy tokens used throughout styles.css */
+    --primary-color: var(--brand);
+    --text-color: var(--text);
+    --text-light: var(--muted);
+    --bg-white: var(--card);
+    --bg-light: var(--tint);
+    --border-color: var(--line);
+    --font-primary: var(--font);
+    --font-size-base: 16px;
+    --line-height-base: 1.55;
+}
+
+:root[data-color-scheme="dark"] {
+    --bg: #0e110f;
+    --card: #171b18;
+    --text: #eaeeeb;
+    --muted: #95a099;
+    --line: #262c28;
+    --line-strong: #353c37;
+    --tint: #1e231f;
+    --brand: #6fbf8a;
+    --brand-fill: #3f8a58;
+    --brand-soft: #1b2b21;
+    --shadow: none;
+    --shadow-hover: none;
+
+    --primary-color: var(--brand);
+    --text-color: var(--text);
+    --text-light: var(--muted);
+    --bg-white: var(--card);
+    --bg-light: var(--tint);
+    --border-color: var(--line);
+}
+
+/* ---------- Base ---------- */
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+p, h1, h2, h3 { overflow-wrap: break-word; }
+
+/* Line icons (icon() in main.js): stroke in the text color, sized to the text.
+   Same rule as onboarding.css, here so pages without it get it too. */
+.icon {
+    width: 1.15em;
+    height: 1.15em;
+    flex-shrink: 0;
+    vertical-align: -0.2em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+a:hover { color: var(--brand); }
+
+:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+.container {
+    max-width: var(--page-max);
+    padding: 0 var(--gutter);
+}
+
+/* Old full-bleed white bands → let the page background through. */
+body > main > section { background: transparent; }
+
+/* ---------- Buttons ---------- */
+
+.btn {
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1.1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.btn-primary { background: var(--brand-fill); color: #fff; }
+.btn-primary:hover { background: var(--brand-fill); color: #fff; filter: brightness(1.08); transform: none; }
+.btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--line-strong); }
+.btn-secondary:hover { background: var(--card); color: var(--text); border-color: var(--muted); }
+
+.btn-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    border: 0;
+    background: var(--card);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+}
+.btn-soft:hover { color: var(--brand); }
+.btn-soft svg { width: 18px; height: 18px; }
+
+/* ---------- Header ---------- */
+
+body > header.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 0;
+    box-shadow: none;
+}
+
+.site-header-in {
+    max-width: var(--page-max);
+    margin: 0 auto;
+    padding: 14px var(--gutter);
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.site-logo {
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    white-space: nowrap;
+}
+.site-logo span { color: var(--brand); }
+.site-logo:hover { color: var(--text); }
+
+nav.site-links {
+    position: static;
+    display: flex;
+    justify-content: flex-start;
+    gap: 20px;
+    padding: 0;
+}
+.site-links a {
+    color: var(--muted);
+    font-size: 15px;
+    white-space: nowrap;
+}
+.site-links a:hover { color: var(--text); }
+.site-links a[aria-current="page"] { color: var(--text); font-weight: 500; }
+.site-links .site-auth-mobile { display: none; }
+
+.site-search {
+    flex: 1;
+    max-width: 340px;
+    margin-left: auto;
+    position: relative;
+}
+.site-search input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px 0 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 15px;
+    transition: background-color .15s, border-color .15s;
+}
+.site-search input::placeholder { color: var(--muted); }
+.site-search input:focus { outline: none; border-color: var(--brand); background: var(--card); }
+.site-search svg {
+    position: absolute;
+    left: 12px;
+    top: 11px;
+    width: 18px;
+    height: 18px;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.site-auth { display: flex; align-items: center; gap: 14px; }
+.site-auth a { color: var(--muted); font-size: 15px; white-space: nowrap; }
+.site-auth a:hover { color: var(--text); }
+.site-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--tint);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+}
+.site-auth a.site-avatar:hover { color: var(--text); box-shadow: 0 0 0 2px var(--brand); }
+.site-avatar { position: relative; }
+.site-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.site-icon-btn {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: 50%;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+.site-icon-btn:hover { background: var(--card); color: var(--text); }
+.site-icon-btn svg { width: 18px; height: 18px; }
+/* Show the moon in light mode, the sun in dark mode. */
+.site-theme .icon-sun { display: none; }
+:root[data-color-scheme="dark"] .site-theme .icon-sun { display: block; }
+:root[data-color-scheme="dark"] .site-theme .icon-moon { display: none; }
+
+.site-menu-btn { display: none; }
+
+/* The open menu panel lives inside the header; lift the header above the page
+   backdrop (styles.css, z-index 150), or the backdrop covers the panel. */
+body.nav-panel-open > header.site-header { z-index: 200; }
+
+/* Phone & small tablet: links fold into a panel under the header. */
+@media (max-width: 860px) {
+    .site-header-in { gap: 10px; padding: 12px 16px; }
+    .site-search { max-width: none; }
+    .site-header-in > .site-auth { display: none; }
+    .site-menu-btn { display: grid; }
+
+    nav.site-links {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 8px 16px 16px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, .06);
+        display: none;
+    }
+    nav.site-links.active { display: flex; }
+    .site-links a { padding: 12px 4px; font-size: 16px; border-bottom: 1px solid var(--line); }
+    .site-links .site-auth-mobile { display: flex; padding-top: 12px; }
+    .site-links .site-auth-mobile a { border: 0; padding: 4px; }
+}
+
+@media (max-width: 420px) {
+    .site-logo { font-size: 17px; }
+}
+
+/* ---------- Footer ---------- */
+
+body > footer {
+    background: transparent;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding: 24px 0;
+    margin-top: 48px;
+    font-size: 14px;
+    text-align: left;
+}
+body > footer .container { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+body > footer p { margin: 0; color: var(--muted); }
+
+/* ---------- Home: claims feed ---------- */
+
+.page {
+    max-width: var(--page-max);
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px var(--gutter) 64px;
+}
+
+.home-intro {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 24px 0 28px;
+    padding: 0;
+}
+.home-intro h1 {
+    font-size: clamp(26px, 3.4vw, 36px);
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    max-width: 620px;
+    margin: 0;
+}
+.home-intro p { color: var(--muted); margin: 8px 0 0; }
+.home-intro { align-items: center; }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Find an answer / Help out switch (replaces the page title) */
+.mode-switch {
+    display: inline-flex;
+    padding: 4px;
+    background: var(--tint);
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+}
+.mode-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 9px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mode-switch button:hover { color: var(--text); }
+.mode-switch button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+:root[data-color-scheme="dark"] .mode-switch button[aria-pressed="true"] { background: var(--line-strong); }
+.mode-switch svg { width: 16px; height: 16px; flex: none; }
+#findControls[hidden], #helpControls[hidden], .help-more[hidden] { display: none; }
+
+/* Help out: task picker */
+.help-tasks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+.help-task {
+    text-align: left;
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    font: inherit;
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.help-task:hover { border-color: var(--muted); }
+.help-task[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.help-task-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.help-task-title .icon { width: 16px; height: 16px; color: var(--brand); }
+.help-task-sub { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+.help-task-n { display: block; color: var(--muted); font-size: 13px; font-weight: 500; margin-top: 8px; }
+
+/* Help out: compact cards built around one action */
+.help-card { padding: 16px 18px; }
+.help-signal { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--brand); }
+.help-signal .priority-tally { font-size: inherit; color: inherit; }
+.help-claim { display: block; font-size: 16px; color: var(--text); }
+.help-claim:hover { color: var(--brand); }
+.help-card .claim-reply { margin-top: 10px; }
+.help-action { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.help-cta { display: inline-flex; align-items: center; gap: 6px; }
+.help-cta .icon { width: 15px; height: 15px; }
+.help-vote { display: flex; flex-wrap: wrap; gap: 6px; }
+.help-vote .priority-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+.help-vote .priority-btn:hover { border-color: var(--muted); }
+.help-vote .priority-btn.is-selected { background: var(--text); color: var(--bg); border-color: var(--text); }
+.help-vote .priority-btn:disabled { opacity: .6; cursor: default; }
+.help-more { text-align: center; margin: 16px 0 0; }
+
+/* Phone: the three tasks become one swipeable row of short cards. */
+@media (max-width: 600px) {
+    .help-tasks {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(150px, 1fr);
+        overflow-x: auto;
+        padding: 2px;
+        margin: 0 -2px;
+        scrollbar-width: none;
+    }
+    .help-tasks::-webkit-scrollbar { display: none; }
+    .help-task { padding: 12px; }
+    .help-task-sub { display: none; }
+    .help-task-n { margin-top: 4px; }
+}
+.help-more a { color: var(--brand); }
+
+
+/* Composer (opened by "Add a claim") */
+.composer {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
+    padding: 20px;
+    margin: 0 0 28px;
+}
+.composer label { font-weight: 600; display: block; }
+.composer-help { color: var(--muted); font-size: 14px; margin: 4px 0 12px; }
+.composer textarea {
+    width: 100%;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    padding: 12px 14px;
+    font: inherit;
+    resize: vertical;
+}
+.composer textarea:focus { outline: none; border-color: var(--brand); background: var(--card); }
+.composer .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+.eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin: 0 0 10px;
+}
+
+/* Person picker */
+.chip-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 2px 4px;
+    margin: 0 -2px;
+    scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+/* Fade the edge that has more chips beyond it (set by watchRowOverflow in main.js). */
+.chip-row.has-more-right { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); }
+.chip-row.has-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 15%); mask-image: linear-gradient(to right, transparent, #000 15%); }
+.chip-row.has-more-left.has-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); }
+.chip:hover { color: var(--text); border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+.filter-hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+.filter-clear {
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    color: var(--brand);
+    cursor: pointer;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+.filter-clear:hover { text-decoration: underline; }
+
+/* Topics */
+.topic-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 24px; }
+.topic {
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+.topic:hover { color: var(--text); }
+.topic[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+/* Cards */
+.claim-grid { columns: 2 340px; column-gap: 16px; }
+.claim-card {
+    break-inside: avoid;
+    display: block;
+    margin-bottom: 16px;
+    padding: 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+/* Shadow-only hover: a transform on an item of a multi-column layout makes the
+   card at the top of the second column jump/clip differently from the others. */
+.claim-card:hover { color: var(--text); box-shadow: var(--shadow-hover); border-color: var(--line-strong); }
+.claim-text {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+.claim-reply {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--brand-soft);
+    font-size: 14px;
+}
+.claim-reply p {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.claim-reply-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--brand);
+    margin-bottom: 4px;
+}
+.claim-reply-empty { background: none; border: 1px dashed var(--line-strong); }
+.claim-reply-empty p { color: var(--muted); }
+.claim-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+}
+.claim-foot { flex-wrap: wrap; }
+.claim-persona {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+}
+.claim-tag { margin-left: auto; padding: 2px 8px; border-radius: 6px; background: var(--bg); }
+
+.feed-status { color: var(--muted); padding: 40px 0; text-align: center; }
+.feed-status.error { color: var(--error-color); }
+.feed-empty { text-align: center; padding: 40px 0; color: var(--muted); }
+.feed-empty p { margin-bottom: 12px; }
+.feed-more { display: flex; margin: 8px auto 0; }
+.feed-more[hidden], .composer[hidden] { display: none; }
+
+@media (max-width: 600px) {
+    :root { --gutter: 16px; }
+    .home-intro { margin-top: 8px; }
+    .claim-card { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .claim-card, .claim-card:hover { transition: none; }
+}
+
+/* ---------- Forms ---------- */
+
+/* Selects inside forms look like the text fields next to them. */
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    font-family: var(--font);
+    font-size: 1rem;
+    color: var(--text);
+    background-color: var(--card);
+    background-image: var(--select-arrow);
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: border-color .15s ease;
+}
+.form-group select:focus { outline: none; border-color: var(--brand); }
+
+.field-error { color: var(--error-color, #b3261e); font-size: 0.875rem; margin: 0.4rem 0 0.2rem; }
+.field-error[hidden], #pendingVotesNote[hidden] { display: none; }
+.composer-source-input[aria-invalid="true"] { border-color: var(--error-color, #b3261e); }
+
+/* ==========================================================================
+   Other pages: the same soft-cards look as the home feed.
+   Overrides the older styles.css components; plain page background, left-
+   aligned compact titles, white cards with one soft shadow, quiet chips.
+   ========================================================================== */
+
+/* No tinted bands: every page sits on the plain page background. */
+.contribute-hero, .explore-hero, .explore-content, .contribution-form-section,
+.article-hero, .article-content, .admin-section { background: transparent; }
+
+/* Page titles like the home page: left, compact, muted lead. */
+.contribute-hero, .explore-hero { text-align: left; padding: 40px 0 8px; }
+.contribute-hero h2, .explore-hero h2 {
+    font-size: clamp(26px, 3.4vw, 36px);
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin: 0 0 8px;
+}
+.contribute-hero p, .explore-hero p {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 640px;
+    margin: 0 0 16px;
+}
+.hero-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+.explore-content { padding: 16px 0 48px; }
+.contribution-form-section { padding: 8px 0 48px; }
+
+/* "← Back" links: a quiet line, not a band. */
+.article-hero { padding: 24px 0 0; border: 0; }
+.article-breadcrumb { margin: 0; }
+.article-breadcrumb a { color: var(--muted); font-size: 14px; }
+.article-breadcrumb a:hover { color: var(--text); }
+
+/* Section titles: left, in the text color. */
+.section-header { text-align: left; margin: 0 0 16px; }
+.section-header h3 { font-size: 20px; color: var(--text); margin: 0 0 4px; }
+.section-header p { color: var(--muted); font-size: 15px; }
+.evs-section-header { margin-top: 40px; }
+
+/* Cards */
+.counter-argument-card, .archetype-card, .response-card, .library-card,
+.contribution-form, .persona-section, .profile-stats .stat-card,
+.endorsement-card, .user-card, .submission-card, .review-item, .admin-login {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.counter-argument-card { transition: box-shadow .15s ease, border-color .15s ease; }
+.counter-argument-card:hover, .library-card:hover, .archetype-card-link:hover {
+    transform: none;
+    box-shadow: var(--shadow-hover);
+    border-color: var(--line-strong);
+}
+.response-card { padding: 20px; }
+.contribution-form { padding: 28px; max-width: 520px; margin: 8px 0 0; }
+
+/* Persona cards keep their colour in the name and avatar only. */
+.archetype-card { border-top: 1px solid var(--line); padding: 20px; }
+.persona-hero {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+}
+.persona-section { padding: 20px; margin-bottom: 16px; }
+
+/* The claim at the top of its page: a plain card, like the feed cards. */
+.narrative-header {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin: 16px 0 24px;
+}
+.narrative-header h2 { font-size: clamp(22px, 2.6vw, 28px); line-height: 1.25; letter-spacing: -0.02em; }
+
+/* "Profiles without an answer": a quiet dashed box, like an empty answer slot. */
+.gaps-section {
+    background: transparent;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+/* Persona names and tags look the same as on the feed cards. */
+.persona-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+.tag {
+    background: var(--bg);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 13px;
+}
+button.tag:hover { color: var(--text); }
+
+/* Form fields: like the home composer. */
+.form-group input:not([type="checkbox"]):not([type="radio"]),
+.form-group textarea,
+.form-group select {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+}
+.form-group input:not([type="checkbox"]):not([type="radio"]):focus,
+.form-group textarea:focus,
+.form-group select:focus { border-color: var(--brand); background-color: var(--card); }
+.form-group label { font-weight: 600; }
+.btn { border-radius: var(--radius-sm); }
+
+/* Profile: section titles in the text colour, quiet empty states. */
+.profile-section .section-header h3, .profile-rail-section .section-header h3 { font-size: 18px; }
+.profile-stats .stat-n { color: var(--text); }
+.profile-section .empty-message { padding: 20px; }
+
+/* Admin */
+.submission-new {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Narrow pages keep the same left edge as every other page: the container is
+   full width, its content is capped. */
+.container.container-narrow { max-width: var(--page-max); }
+.container-narrow > * { max-width: 820px; }
+
+/* Filter bar (library, articles): sits on the page background. */
+.filterbar { background: var(--bg); }
+.filterbar-btn { background: var(--card); border-color: var(--line); color: var(--text); }
+.filterbar-btn:hover, .filterbar-facet.is-open .filterbar-btn { border-color: var(--muted); }
+.filterbar-facet.has-selection .filterbar-btn { border-color: var(--brand); background: var(--brand-soft); }
+
+/* Library counters: quiet and left-aligned, under the intro. */
+.contribute-stats { justify-content: flex-start; gap: 32px; margin: 8px 0 8px; }
+.stat-tile { align-items: flex-start; }
+.stat-n { color: var(--text); font-size: 24px; }
+
+/* Article cards and reader */
+.card-title { color: var(--text); font-size: 18px; line-height: 1.3; }
+.card-title-link:hover .card-title { color: var(--brand); }
+.card-narrative { background: var(--bg); border-radius: var(--radius-sm); }
+.article-header { margin: 24px 0 16px; max-width: 720px; }
+.article-header h2 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; letter-spacing: -0.03em; }
+.article-body { max-width: 720px; text-align: left; line-height: 1.65; }
+.article-body p, .article-body li { text-align: left; }
+.article-body h2 { font-size: 22px; margin-top: 32px; }
+.article-body h3 { font-size: 18px; margin-top: 24px; }
+
+/* Empty states inside a card: smaller, calmer text. */
+.empty-message { font-size: 15px; }
+
+/* Profiles page: each profile's share of the population. */
+.population-shares {
+    display: grid;
+    gap: 4px;
+    max-width: 720px;
+    padding: 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.share-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr 48px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 15px;
+}
+.share-row:hover { background: var(--tint); color: var(--text); }
+.share-bar { height: 8px; border-radius: 999px; background: var(--tint); overflow: hidden; }
+.share-fill { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
+.share-pct { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+    .share-row { grid-template-columns: 1fr 44px; row-gap: 6px; }
+    .share-bar { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* Phone: sort and search each get their own line in the filter bar. */
+@media (max-width: 600px) {
+    .filterbar-tail { flex-wrap: wrap; justify-content: flex-start; }
+    .filterbar-search { flex: 1 1 100%; }
+    .contribute-stats { gap: 20px; }
+    .stat-label { font-size: 13px; }
+}
+
+/* Resources: Bibliothèque / Articles switch (same look as the home mode switch). */
+.sub-tabs { margin: 0 0 20px; }
+.sub-tabs a {
+    padding: 8px 16px;
+    border-radius: 9px;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 500;
+}
+.sub-tabs a:hover { color: var(--text); }
+.sub-tabs a[aria-current="page"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+:root[data-color-scheme="dark"] .sub-tabs a[aria-current="page"] { background: var(--line-strong); }
+
+/* Profile « Comment aider »: the main column is narrow, so one task per row. */
+#contributeSection .help-paths { grid-template-columns: 1fr; }
+#contributeSection .onb-step { font-size: 17px; margin: 20px 0 10px; }

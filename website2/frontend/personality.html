@@ -1,56 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personality - re.inform</title>
-    <meta name="description" content="A personality profile: their values and the approach most likely to change their mind.">
+    <title data-i18n="persona.metaTitle">Profil - re.inform</title>
+    <meta name="description" content="Un profil : ses valeurs, et l’approche la plus susceptible de le faire changer d’avis." data-i18n-content="persona.metaDescription">
+    <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <nav>
-                <div class="logo">
-                    <a href="index.html"><h1>re.inform</h1></a>
-                </div>
-                <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <ul class="nav-links" id="navLinks">
-                    <li><a href="index.html">Claims</a></li>
-                    <li><a href="personalities.html" class="active">Personas</a></li>
-                    <li><a href="library.html">Library</a></li>
-                    <li><a href="resources.html">Articles</a></li>
-                    <li><a href="contribute.html" class="nav-cta">Contribute</a></li>
-                    <li class="auth-links" id="authLinks"></li>
-                    <li class="theme-toggle" aria-label="Color scheme">
-                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </li>
-                </ul>
+    <header class="site-header">
+        <div class="site-header-in">
+            <a class="site-logo" href="index.html">re<span>.</span>inform</a>
+            <nav class="site-links" id="siteLinks" aria-label="Navigation principale" data-i18n-aria-label="nav.main">
+                <a href="index.html" data-i18n="nav.debunk">Débunker</a>
+                <a href="personalities.html" aria-current="page" data-i18n="nav.personas">Profils</a>
+                <a href="library.html" data-i18n="nav.resources">Ressources</a>
+                <a href="index.html?mode=help" data-i18n="nav.contribute">Participer</a>
+                <div class="site-auth site-auth-mobile" data-auth-links></div>
             </nav>
+            <form class="site-search" action="index.html" role="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" name="q" id="siteSearch" placeholder="Rechercher une idée reçue…" data-i18n-placeholder="nav.searchPlaceholder" aria-label="Rechercher une idée reçue" data-i18n-aria-label="nav.searchLabel" autocomplete="off">
+            </form>
+            <div class="site-auth" id="authLinks" data-auth-links></div>
+            <button type="button" class="site-icon-btn site-theme" data-color-scheme-toggle aria-label="Changer de thème" data-i18n-aria-label="theme.toggle">
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z"/></svg>
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </button>
+            <button type="button" class="site-icon-btn site-menu-btn" aria-label="Menu" data-i18n-aria-label="nav.menu" aria-controls="siteLinks" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
         </div>
     </header>
 
@@ -58,26 +41,27 @@
         <section class="article-hero">
             <div class="container">
                 <div class="article-breadcrumb">
-                    <a href="personalities.html">← All personalities</a>
+                    <a href="personalities.html" data-i18n="persona.back">← Tous les profils</a>
                 </div>
             </div>
         </section>
 
         <section class="explore-content">
             <div class="container container-narrow">
-                <div id="personaLoading" class="loading-message">Loading personality…</div>
+                <div id="personaLoading" class="loading-message" data-i18n="persona.loading">Chargement du profil…</div>
                 <div id="personaError" class="error-message" style="display: none;"></div>
 
                 <div id="personaProfile" class="persona-profile" style="display: none;"></div>
 
-                <nav id="personaNav" class="persona-nav" style="display: none;" aria-label="Other personalities"></nav>
+                <nav id="personaNav" class="persona-nav" style="display: none;" aria-label="Autres profils" data-i18n-aria-label="persona.otherProfiles"></nav>
             </div>
         </section>
     </main>
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+            <p>&copy; 2026 re.inform</p>
+            <p data-i18n="site.tagline">Renouer le dialogue, preuves à l’appui.</p>
         </div>
     </footer>
 

@@ -98,6 +98,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Header UI: one button that flips between light and dark.
+    document.querySelectorAll('[data-color-scheme-toggle]').forEach((btn) => {
+        const label = () => btn.setAttribute('aria-label',
+            document.documentElement.getAttribute('data-color-scheme') === 'dark'
+                ? t('theme.toLight') : t('theme.toDark'));
+        label();
+        btn.addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-color-scheme') === 'dark';
+            setPreference(isDark ? 'light' : 'dark');
+            label();
+        });
+    });
+
     // Legacy UI: select dropdown (kept for compatibility)
     const select = document.getElementById('colorSchemeSelect');
     if (select) {

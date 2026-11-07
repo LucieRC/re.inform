@@ -1,75 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personalities - re.inform</title>
-    <meta name="description" content="Explore the 10 EVS-derived personalities and their population shares.">
+    <title data-i18n="personas.metaTitle">Profils - re.inform</title>
+    <meta name="description" content="Les profils des personnes à qui vous parlez, et leur part dans la population française." data-i18n-content="personas.metaDescription">
+    <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <nav>
-                <div class="logo">
-                    <a href="index.html"><h1>re.inform</h1></a>
-                </div>
-                <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <ul class="nav-links" id="navLinks">
-                    <li><a href="index.html">Claims</a></li>
-                    <li><a href="personalities.html" class="active" aria-current="page">Personas</a></li>
-                    <li><a href="library.html">Library</a></li>
-                    <li><a href="resources.html">Articles</a></li>
-                    <li><a href="contribute.html" class="nav-cta">Contribute</a></li>
-                    <li class="auth-links" id="authLinks"></li>
-                    <li class="theme-toggle" aria-label="Color scheme">
-                        <div class="theme-toggle-group" role="group" aria-label="Color scheme">
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="light" aria-pressed="false" title="Light">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="system" aria-pressed="false" title="Same as computer">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="theme-toggle-btn" data-color-scheme-option="dark" aria-pressed="false" title="Night">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </li>
-                </ul>
+    <header class="site-header">
+        <div class="site-header-in">
+            <a class="site-logo" href="index.html">re<span>.</span>inform</a>
+            <nav class="site-links" id="siteLinks" aria-label="Navigation principale" data-i18n-aria-label="nav.main">
+                <a href="index.html" data-i18n="nav.debunk">Débunker</a>
+                <a href="personalities.html" aria-current="page" data-i18n="nav.personas">Profils</a>
+                <a href="library.html" data-i18n="nav.resources">Ressources</a>
+                <a href="index.html?mode=help" data-i18n="nav.contribute">Participer</a>
+                <div class="site-auth site-auth-mobile" data-auth-links></div>
             </nav>
+            <form class="site-search" action="index.html" role="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" name="q" id="siteSearch" placeholder="Rechercher une idée reçue…" data-i18n-placeholder="nav.searchPlaceholder" aria-label="Rechercher une idée reçue" data-i18n-aria-label="nav.searchLabel" autocomplete="off">
+            </form>
+            <div class="site-auth" id="authLinks" data-auth-links></div>
+            <button type="button" class="site-icon-btn site-theme" data-color-scheme-toggle aria-label="Changer de thème" data-i18n-aria-label="theme.toggle">
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z"/></svg>
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </button>
+            <button type="button" class="site-icon-btn site-menu-btn" aria-label="Menu" data-i18n-aria-label="nav.menu" aria-controls="siteLinks" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
         </div>
     </header>
 
     <main>
         <section class="explore-hero">
             <div class="container">
-                <h2>Personalities</h2>
-                <p>Who you're talking to — and the kind of approach that could actually change their mind.</p>
+                <h2 data-i18n="personas.title">Profils</h2>
+                <p data-i18n="personas.lead">À qui vous parlez, et l’approche qui a une chance de le faire changer d’avis.</p>
             </div>
         </section>
 
         <section class="explore-content">
             <div class="container">
-                <div id="loadingMessage" class="loading-message">Loading personalities...</div>
+                <div id="loadingMessage" class="loading-message" data-i18n="personas.loading">Chargement des profils…</div>
                 <div id="errorMessage" class="error-message" style="display: none;"></div>
 
                 <div class="section-header">
-                    <h3>Archetypes</h3>
-                    <p>Each archetype pairs a <strong>value system</strong> with the <strong>persuasion approach</strong> most likely to move them. On any claim, you can filter responses by these profiles.</p>
+                    <h3 data-i18n="personas.archetypesTitle">Archétypes</h3>
+                    <p data-i18n-html="personas.archetypesLeadHtml">Chaque archétype associe un <strong>système de valeurs</strong> à l’<strong>approche de persuasion</strong> la plus susceptible de le faire bouger. Sur chaque idée reçue, vous pouvez filtrer les réponses selon ces profils.</p>
                 </div>
 
                 <div id="archetypesGrid" class="archetypes-grid">
@@ -77,16 +60,16 @@
                 </div>
 
                 <div class="section-header evs-section-header">
-                    <h3>Population grounding — EVS 2018 (France)</h3>
-                    <p>How common are these mindsets? These ten value-clusters, derived from the European Values Study (n=1,870), estimate the share of the French population behind them. They anchor the archetypes above in data.</p>
+                    <h3 data-i18n="personas.evsTitle">Dans la population française</h3>
+                    <p data-i18n="personas.evsLead">Part estimée de chaque profil parmi les Français, d’après l’enquête European Values Study 2017-2018 (n = 1 870).</p>
                 </div>
 
-                <div id="personalitiesGrid" class="counter-arguments-grid personalities-grid">
-                    <!-- EVS clusters load here dynamically -->
+                <div id="personalitiesGrid" class="population-shares">
+                    <!-- Population share of each profile (EVS 2017-2018) -->
                 </div>
 
                 <div id="emptyPersonalitiesMessage" class="empty-message" style="display: none;">
-                    <p>No personalities available yet.</p>
+                    <p data-i18n="personas.empty">Aucun profil disponible pour l’instant.</p>
                 </div>
             </div>
         </section>
@@ -94,7 +77,8 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 re.inform. Building bridges through evidence-based dialogue.</p>
+            <p>&copy; 2026 re.inform</p>
+            <p data-i18n="site.tagline">Renouer le dialogue, preuves à l’appui.</p>
         </div>
     </footer>
 

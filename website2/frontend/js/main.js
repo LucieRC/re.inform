@@ -72,7 +72,7 @@ function itemMatchesAnySelectedTag(item, selectedTags) {
     return selectedTags.some((tag) => item.tags.includes(tag));
 }
 
-function ensureMultiTagDropdown(selectEl, { placeholder = 'All topics' } = {}) {
+function ensureMultiTagDropdown(selectEl, { placeholder = t('filter.allTopics') } = {}) {
     if (!selectEl || !(selectEl instanceof HTMLSelectElement)) return;
 
     // Keep the original select as the source of truth, but allow multiple selections.
@@ -216,7 +216,7 @@ function updateMultiTagTriggerText(selectEl, triggerEl, placeholder) {
         triggerEl.textContent = opt?.textContent || selected[0];
         return;
     }
-    triggerEl.textContent = `${selected.length} topics`;
+    triggerEl.textContent = t('filter.topicsCount', { n: selected.length });
 }
 
 // ========================================
@@ -224,12 +224,14 @@ function updateMultiTagTriggerText(selectEl, triggerEl, placeholder) {
 // ========================================
 
 function setupNavPanel() {
-    const toggle = document.querySelector('.mobile-menu-toggle');
-    const navLinks = document.querySelector('.nav-links');
+    const toggle = document.querySelector('.site-menu-btn, .mobile-menu-toggle');
+    const navLinks = document.querySelector('.site-links, .nav-links');
     if (!toggle || !navLinks) return;
 
     // One backdrop per page, created here so every page gets it without
-    // repeating markup in a dozen HTML files.
+    // repeating markup in a dozen HTML files. (The new header's panel drops
+    // down under the bar and needs no backdrop styling, but closing on an
+    // outside click is still handled through it.)
     let backdrop = document.querySelector('.nav-backdrop');
     if (!backdrop) {
         backdrop = document.createElement('div');
@@ -272,7 +274,7 @@ function setupNavPanel() {
     });
 
     // Widening past the breakpoint must not leave the page scroll-locked.
-    const wide = window.matchMedia('(min-width: 1101px)');
+    const wide = window.matchMedia(navLinks.classList.contains('site-links') ? '(min-width: 861px)' : '(min-width: 1101px)');
     const syncToWidth = () => {
         if (wide.matches && isOpen()) setOpen(false);
     };
@@ -281,6 +283,16 @@ function setupNavPanel() {
 
 // Expose the sticky header's height as --header-height so sticky bars below it
 // (the filter bar) stop right under the header instead of sliding beneath it.
+// The header search is narrow on phones: use the short placeholder there.
+function syncSearchPlaceholder() {
+    const input = document.getElementById('siteSearch');
+    if (!input || !window.matchMedia) return;
+    const narrow = window.matchMedia('(max-width: 600px)');
+    const apply = () => { input.placeholder = t(narrow.matches ? 'nav.searchPlaceholderShort' : 'nav.searchPlaceholder'); };
+    apply();
+    narrow.addEventListener('change', apply);
+}
+
 function syncHeaderHeight() {
     const header = document.querySelector('body > header');
     if (!header) return;
@@ -293,6 +305,7 @@ function syncHeaderHeight() {
 document.addEventListener('DOMContentLoaded', async () => {
     setupNavPanel();
     syncHeaderHeight();
+    syncSearchPlaceholder();
 
     // Check authentication state first
     await checkAuthState();
@@ -355,48 +368,27 @@ async function checkAuthState() {
     }
 }
 
+function setAuthLinks(html) {
+    document.querySelectorAll('[data-auth-links], #authLinks').forEach((el) => { el.innerHTML = html; });
+}
+
 function updateNavForLoggedInUser() {
-    const authLinks = document.getElementById('authLinks');
-    if (!authLinks) return;
-
-    const roleRaw = (currentUser?.role || '').toString().trim();
-    const roleNormalized = roleRaw.toLowerCase();
-    const shouldShowRoleBadge = roleRaw && roleNormalized !== 'registered';
-    const roleBadgeHtml = shouldShowRoleBadge
-        ? `<span class="role-badge ${roleNormalized}">${roleRaw}</span>`
+    const name = currentUser?.username || t('nav.profileFallback');
+    const usernameEscaped = escapeHtml(name);
+    const initial = escapeHtml(name.trim().charAt(0).toUpperCase() || '?');
+    // Real profile picture when one is uploaded; otherwise the first letter.
+    const avatar = safeHref(currentUser?.avatar_url)
+        ? `<img src="${escapeHtml(safeHref(currentUser.avatar_url))}" alt="" onerror="this.remove()">`
         : '';
 
-    const usernameEscaped = escapeHtml(currentUser?.username || 'Profile');
-
-    // Real profile picture when one is uploaded; otherwise the default icon.
-    const avatarMarkup = currentUser?.avatar_url
-        ? `<img class="profile-image" src="${currentUser.avatar_url}" alt="" aria-hidden="true" onerror="this.classList.add('profile-image-missing')">`
-        : '';
-
-    authLinks.innerHTML = `
-        <div class="user-menu">
-            <a href="profile.html" class="user-info" aria-label="Profile (${usernameEscaped})" title="${usernameEscaped}">
-                <span class="profile-icon ${currentUser?.avatar_url ? 'profile-icon-avatar' : ''}" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 21a8 8 0 0 0-16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    ${avatarMarkup}
-                </span>
-                ${roleBadgeHtml}
-            </a>
-            <a href="#" onclick="logout(); return false;" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Logout</a>
-        </div>
-    `;
+    setAuthLinks(`
+        <a href="#" onclick="logout(); return false;">${escapeHtml(t('nav.logout'))}</a>
+        <a href="profile.html" class="site-avatar" aria-label="${escapeHtml(t('nav.profile', { name }))}" title="${usernameEscaped}">${initial}${avatar}</a>
+    `);
 }
 
 function updateNavForLoggedOutUser() {
-    const authLinks = document.getElementById('authLinks');
-    if (!authLinks) return;
-    
-    authLinks.innerHTML = `
-        <a href="${authHref()}">Log in</a>
-    `;
+    setAuthLinks(`<a href="${authHref()}">${escapeHtml(t('nav.login'))}</a>`);
 }
 
 async function logout() {
@@ -422,11 +414,11 @@ async function logout() {
 // Votes cast without an account are kept until the visitor signs up.
 function pendingVotesHtml(count) {
     const n = Math.max(1, count || 1);
-    return `Vote saved. <a href="${authHref('register.html')}">Create a free account</a> and your ${n} vote${n === 1 ? '' : 's'} will count.`;
+    return t('votes.pendingHtml', { n, href: authHref('register.html') });
 }
 
 function claimedVotesText(count) {
-    return count ? ` Your ${count} vote${count === 1 ? ' now counts' : 's now count'}.` : '';
+    return count ? t('votes.claimed', { n: count }) : '';
 }
 
 // After login/register, return to the page that asked for an account.
@@ -443,6 +435,22 @@ function authHref(page = 'login.html') {
     return `${page}?next=${encodeURIComponent(here + window.location.search + window.location.hash)}`;
 }
 
+// The session ended (API 401 auth_required): go to login, then come back here.
+function goToLogin() {
+    window.location.href = authHref('login.html');
+}
+
+// An API error as a toast, with a way out when the cause is "log in" or "create an account".
+function apiErrorToast(data, fallbackKey, res = null) {
+    let action = {};
+    if (isAuthRequired(res, data) || data?.code === 'auth_required') {
+        action = { actionLabel: t('common.login'), actionHref: authHref('login.html'), duration: 8000 };
+    } else if (data?.needs_account) {
+        action = { actionLabel: t('common.createAccount'), actionHref: authHref('register.html'), duration: 8000 };
+    }
+    showToast(apiError(data, fallbackKey), action);
+}
+
 function initLoginPage() {
     const form = document.getElementById('loginForm');
     if (!form) return;
@@ -451,9 +459,10 @@ function initLoginPage() {
     document.querySelectorAll('a[href="register.html"]').forEach((a) => { a.href = `register.html${window.location.search}`; });
 
     if (pendingVotes) {
-        const note = document.getElementById('formMessage');
+        const note = document.getElementById('pendingVotesNote') || document.getElementById('formMessage');
         if (note) {
-            note.textContent = `You have ${pendingVotes} vote${pendingVotes === 1 ? '' : 's'} waiting: ${pendingVotes === 1 ? 'it counts' : 'they count'} as soon as you log in.`;
+            note.hidden = false;
+            note.textContent = t('votes.waitingLogin', { n: pendingVotes });
             note.className = 'form-message success';
         }
     }
@@ -474,7 +483,7 @@ function initLoginPage() {
         const loginBtn = document.getElementById('loginBtn');
         
         loginBtn.disabled = true;
-        loginBtn.textContent = 'Logging in...';
+        loginBtn.textContent = t('common.loggingIn');
         
         try {
             const response = await fetch(`${API_BASE_URL}/login`, {
@@ -487,22 +496,22 @@ function initLoginPage() {
             const data = await response.json();
             
             if (response.ok) {
-                formMessage.textContent = `Login successful!${claimedVotesText(data.claimed_votes)} Redirecting...`;
+                formMessage.textContent = t('login.success', { claimed: claimedVotesText(data.claimed_votes) });
                 formMessage.className = 'form-message success';
                 setTimeout(() => {
                     window.location.href = postAuthDestination();
                 }, data.claimed_votes ? 1800 : 1000);
             } else {
-                formMessage.textContent = data.error || 'Login failed';
+                formMessage.textContent = apiError(data, 'login.failed');
                 formMessage.className = 'form-message error';
             }
         } catch (error) {
             console.error('Login error:', error);
-            formMessage.textContent = 'Network error. Please try again.';
+            formMessage.textContent = t('common.networkError');
             formMessage.className = 'form-message error';
         } finally {
             loginBtn.disabled = false;
-            loginBtn.textContent = 'Login';
+            loginBtn.textContent = t('common.login');
         }
     });
 }
@@ -519,9 +528,10 @@ function initRegisterPage() {
     document.querySelectorAll('a[href="login.html"]').forEach((a) => { a.href = `login.html${window.location.search}`; });
 
     if (pendingVotes) {
-        const note = document.getElementById('formMessage');
+        const note = document.getElementById('pendingVotesNote') || document.getElementById('formMessage');
         if (note) {
-            note.textContent = `You have ${pendingVotes} vote${pendingVotes === 1 ? '' : 's'} waiting: ${pendingVotes === 1 ? 'it counts' : 'they count'} as soon as you sign up.`;
+            note.hidden = false;
+            note.textContent = t('votes.waitingRegister', { n: pendingVotes });
             note.className = 'form-message success';
         }
     }
@@ -544,13 +554,13 @@ function initRegisterPage() {
         
         // Validate passwords match
         if (password !== confirmPassword) {
-            formMessage.textContent = 'Passwords do not match';
+            formMessage.textContent = t('register.mismatch');
             formMessage.className = 'form-message error';
             return;
         }
         
         registerBtn.disabled = true;
-        registerBtn.textContent = 'Creating account...';
+        registerBtn.textContent = t('register.submitting');
         
         try {
             const response = await fetch(`${API_BASE_URL}/register`, {
@@ -563,22 +573,22 @@ function initRegisterPage() {
             const data = await response.json();
             
             if (response.ok) {
-                formMessage.textContent = `Account created!${claimedVotesText(data.claimed_votes)} Redirecting...`;
+                formMessage.textContent = t('register.success', { claimed: claimedVotesText(data.claimed_votes) });
                 formMessage.className = 'form-message success';
                 setTimeout(() => {
                     window.location.href = postAuthDestination();
                 }, data.claimed_votes ? 1800 : 1000);
             } else {
-                formMessage.textContent = data.error || 'Registration failed';
+                formMessage.textContent = apiError(data, 'register.failed');
                 formMessage.className = 'form-message error';
             }
         } catch (error) {
             console.error('Registration error:', error);
-            formMessage.textContent = 'Network error. Please try again.';
+            formMessage.textContent = t('common.networkError');
             formMessage.className = 'form-message error';
         } finally {
             registerBtn.disabled = false;
-            registerBtn.textContent = 'Create account';
+            registerBtn.textContent = t('register.submit');
         }
     });
 }
@@ -604,7 +614,7 @@ async function initProfilePage() {
     } else {
         // No ID in URL - must be logged in to view own profile
         if (!currentUser) {
-            window.location.href = 'login.html';
+            goToLogin();
             return;
         }
         profileUserId = currentUser.id;
@@ -624,8 +634,13 @@ async function initProfilePage() {
         document.getElementById('statusTrackerSection').style.display = 'block';
         document.getElementById('tagsFollowingSection').style.display = 'block';
         document.getElementById('followingSection').style.display = 'block';
-        document.getElementById('contributionsTitle').textContent = 'Your contributions';
+        document.getElementById('contributionsTitle').textContent = t('profile.contributionsMine');
         document.getElementById('rolesSection').style.display = 'block';
+        const helpSection = document.getElementById('contributeSection');
+        if (helpSection) {
+            helpSection.style.display = 'block';
+            initContributePage();
+        }
         await Promise.all([
             loadMyRoles(),
             loadRecommendations(),
@@ -635,7 +650,7 @@ async function initProfilePage() {
             loadContributionStatus(),
         ]);
     } else {
-        document.getElementById('contributionsTitle').textContent = 'Contributions';
+        document.getElementById('contributionsTitle').textContent = t('profile.contributionsTitle');
         // Show follow button if logged in and viewing someone else
         if (currentUser) {
             document.getElementById('followButtonContainer').style.display = 'block';
@@ -666,12 +681,12 @@ function setupProfileControls() {
 
 // ---- Level bar (reputation → progression, per the gamification design) ----
 const LEVELS = [
-    { name: 'Observer', min: 0 },
-    { name: 'Engager', min: 51 },
-    { name: 'Strategist', min: 201 },
-    { name: 'Researcher', min: 501 },
-    { name: 'Community Leader', min: 1001 },
-];
+    { key: 'level.observer', min: 0 },
+    { key: 'level.engager', min: 51 },
+    { key: 'level.strategist', min: 201 },
+    { key: 'level.researcher', min: 501 },
+    { key: 'level.leader', min: 1001 },
+].map((l) => ({ ...l, name: t(l.key) }));
 
 function renderLevelBar(points) {
     const bar = document.getElementById('levelBar');
@@ -691,27 +706,38 @@ function renderLevelBar(points) {
     let pct;
     if (next) {
         pct = Math.round(((p - current.min) / (next.min - current.min)) * 100);
-        nextEl.textContent = `${next.min - p} pts to ${next.name}`;
+        nextEl.textContent = t('level.next', { n: next.min - p, level: next.name });
     } else {
         pct = 100;
-        nextEl.textContent = 'Top level reached';
+        nextEl.textContent = t('level.top');
     }
     pct = Math.max(0, Math.min(100, pct));
     fill.style.width = `${pct}%`;
     track.setAttribute('aria-valuenow', String(pct));
-    track.setAttribute('aria-valuetext', next ? `${current.name}, ${pct}% to ${next.name}` : current.name);
+    track.setAttribute('aria-valuetext', next ? t('level.valueText', { level: current.name, pct, next: next.name }) : current.name);
 }
 
-// ---- Contributor roles (function, not rights: see GAMIFICATION_DESIGN.md) ----
+// ---- Contributor roles (function, not rights: see docs/design/GAMIFICATION_DESIGN.md) ----
+
+// Role names and texts come from the API in English; the catalog has them by role id.
+function roleText(roleId, field, fallback) {
+    return tOr(`role.${roleId}.${field}`, fallback);
+}
+
+// users.role (rights): member, trusted, moderator, admin.
+function userRoleLabel(role) {
+    return tOr(`userRole.${role}`, role);
+}
 
 function renderRoleChips(roles) {
     const el = document.getElementById('profileRoles');
     if (!el) return;
     el.innerHTML = roles.map((r) => {
         const confirmed = r.tier === 'confirmed';
-        const title = `${confirmed ? 'Confirmed' : 'Apprentice'} ${r.name}`;
+        const name = roleText(r.role, 'name', r.name);
+        const title = t('role.chipTitle', { name, tier: t(confirmed ? 'role.tier.confirmed' : 'role.tier.apprentice') });
         return `<span class="role-chip${confirmed ? ' is-confirmed' : ''}" title="${escapeHtml(title)}">
-            ${icon(r.icon)}${escapeHtml(r.name)}${confirmed ? ` ${icon('check')}` : ''}</span>`;
+            ${icon(r.icon)}${escapeHtml(name)}${confirmed ? ` ${icon('check')}` : ''}</span>`;
     }).join('');
 }
 
@@ -723,6 +749,7 @@ async function loadMyRoles() {
             fetch(`${API_BASE_URL}/roles`),
             fetch(`${API_BASE_URL}/me/roles`, { credentials: 'include' }),
         ]);
+        if (mineRes.status === 401) return goToLogin();
         if (!catalogRes.ok || !mineRes.ok) throw new Error('Failed to load roles');
         const catalog = await catalogRes.json();
         const mine = (await mineRes.json()).roles || [];
@@ -734,7 +761,7 @@ async function loadMyRoles() {
         if (isSourcer || canModerate) loadSourceQueue();
     } catch (error) {
         console.error('Roles error:', error);
-        container.innerHTML = '<p class="empty-message">Could not load roles.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('role.loadError'))}</p>`;
     }
 }
 
@@ -744,34 +771,37 @@ function renderMyRoles(catalog, mine) {
 
     container.innerHTML = catalog.map((c) => {
         const r = held.get(c.role);
+        const name = roleText(c.role, 'name', c.name);
+        const duty = roleText(c.role, 'duty', c.duty);
+        const power = roleText(c.role, 'power', c.power);
         let body;
         if (!r) {
-            body = `<p>${escapeHtml(c.duty)}</p>`;
+            body = `<p>${escapeHtml(duty)}</p>`;
         } else if (r.tier === 'confirmed') {
-            body = `<p>${escapeHtml(c.power)}</p>`;
+            body = `<p>${escapeHtml(power)}</p>`;
         } else if (r.progress) {
             const pct = Math.min(100, Math.round((r.progress.done / r.progress.needed) * 100));
-            body = `<p>${escapeHtml(c.duty)}</p>
+            body = `<p>${escapeHtml(duty)}</p>
                 <div class="role-progress">
                     <div class="level-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"
-                         aria-label="Progress to confirmed ${escapeHtml(c.name)}">
+                         aria-label="${escapeHtml(t('role.progressLabel', { name }))}">
                         <span class="level-fill" style="width: ${pct}%"></span>
                     </div>
-                    <span class="role-progress-label">${r.progress.done} / ${r.progress.needed} ${escapeHtml(r.progress.unit)}</span>
+                    <span class="role-progress-label">${r.progress.done} / ${r.progress.needed} ${escapeHtml(roleText(c.role, 'unit', r.progress.unit))}</span>
                 </div>`;
         } else {
-            body = `<p>${escapeHtml(c.power)}</p>`;
+            body = `<p>${escapeHtml(power)}</p>`;
         }
-        const privacy = r && !c.public ? '<p>Only you can see this role.</p>' : '';
-        const tier = r ? `<span class="role-tier${r.tier === 'confirmed' ? ' tier-confirmed' : ''}">${r.tier === 'confirmed' ? 'Confirmed' : 'Apprentice'}</span>` : '';
+        const privacy = r && !c.public ? `<p>${escapeHtml(t('role.private'))}</p>` : '';
+        const tier = r ? `<span class="role-tier${r.tier === 'confirmed' ? ' tier-confirmed' : ''}">${escapeHtml(t(r.tier === 'confirmed' ? 'role.tier.confirmed' : 'role.tier.apprentice'))}</span>` : '';
         const action = r
-            ? `<button type="button" class="link-btn" data-role-drop="${c.role}">Step down</button>`
-            : `<button type="button" class="btn btn-secondary btn-small" data-role-take="${c.role}">Take this role</button>`;
+            ? `<button type="button" class="link-btn" data-role-drop="${c.role}">${escapeHtml(t('role.stepDown'))}</button>`
+            : `<button type="button" class="btn btn-secondary btn-small" data-role-take="${c.role}">${escapeHtml(t('role.take'))}</button>`;
         return `
             <div class="role-card${r ? ' is-held' : ''}">
                 <div class="role-card-head">
                     ${icon(c.icon)}
-                    <span class="role-card-name">${escapeHtml(c.name)}</span>
+                    <span class="role-card-name">${escapeHtml(name)}</span>
                     ${tier}
                 </div>
                 ${body}
@@ -801,16 +831,14 @@ async function changeRole(role, method) {
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            showToast(data.error || 'Could not update your role.');
+            apiErrorToast(data, 'role.error', res);
             return;
         }
-        showToast(method === 'POST'
-            ? 'Role taken. Your work will confirm you in it.'
-            : 'You stepped down. Your past work still counts if you come back.');
+        showToast(t(method === 'POST' ? 'role.taken' : 'role.dropped'));
         await Promise.all([loadMyRoles(), loadProfileData()]);
     } catch (error) {
         console.error('Role change error:', error);
-        showToast('Network error while updating your role.');
+        showToast(t('role.networkError'));
     }
 }
 
@@ -819,35 +847,36 @@ async function loadSourceQueue() {
     if (!container) return;
     try {
         const res = await fetch(`${API_BASE_URL}/me/source-check-queue?limit=3`, { credentials: 'include' });
+        if (res.status === 401) return goToLogin();
         if (!res.ok) throw new Error('Failed to load queue');
         const items = (await res.json()).items || [];
         if (!items.length) {
-            container.innerHTML = '<p class="empty-message">Nothing waiting for you right now. Thank you!</p>';
+            container.innerHTML = `<p class="empty-message">${escapeHtml(t('queue.empty'))}</p>`;
             return;
         }
         container.innerHTML = items.map((it) => {
             const hosts = (it.resources || []).map((r) => hostnameOf(r.url)).join(', ');
-            const checks = it.check_count
-                ? `${it.check_count} check${it.check_count === 1 ? '' : 's'} so far`
-                : 'No check yet';
+            const checks = escapeHtml(it.check_count
+                ? t('queue.checks', { n: it.check_count })
+                : t('queue.noCheck'));
             return `
                 <a class="queue-item" href="argument.html?id=${encodeURIComponent(it.argument_id)}&check=${encodeURIComponent(it.counter_argument_id)}">
                     <span class="queue-claim">“${escapeHtml(it.argument_text || '')}”</span>
                     <span class="queue-text">${escapeHtml(it.text || '')}</span>
-                    <span class="queue-meta">${it.persona ? `For ${escapeHtml(it.persona)} · ` : ''}${icon('clip')} ${escapeHtml(hosts)} · ${checks}</span>
+                    <span class="queue-meta">${it.persona ? escapeHtml(t('queue.forPersona', { name: it.persona })) : ''}${icon('clip')} ${escapeHtml(hosts)} · ${checks}</span>
                 </a>`;
         }).join('');
     } catch (error) {
         console.error('Source queue error:', error);
-        container.innerHTML = '<p class="empty-message">Could not load the queue.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('queue.loadError'))}</p>`;
     }
 }
 
 // ---- Contribution status tracker ----
 const STATUS_META = {
-    pending:  { icon: icon('hourglass'), label: 'Pending review', cls: 'status-pending' },
-    approved: { icon: icon('check'), label: 'Approved',        cls: 'status-approved' },
-    rejected: { icon: icon('x'), label: 'Needs work',      cls: 'status-rejected' },
+    pending:  { icon: icon('hourglass'), label: t('status.pending'),  cls: 'status-pending' },
+    approved: { icon: icon('check'),     label: t('status.approved'), cls: 'status-approved' },
+    rejected: { icon: icon('x'),         label: t('status.rejected'), cls: 'status-rejected' },
 };
 
 async function loadContributionStatus() {
@@ -856,12 +885,13 @@ async function loadContributionStatus() {
 
     try {
         const res = await fetch(`${API_BASE_URL}/me/contributions`, { credentials: 'include' });
+        if (res.status === 401) return goToLogin();
         if (!res.ok) throw new Error(`Request failed: ${res.status}`);
         const data = await res.json();
         renderContributionStatus(data.items || [], data.counts || {});
     } catch (error) {
         console.error('Status tracker error:', error);
-        container.innerHTML = '<p class="empty-message">Couldn\'t load your submissions right now.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('tracker.loadError'))}</p>`;
     }
 }
 
@@ -870,34 +900,37 @@ function renderContributionStatus(items, counts) {
     if (!container) return;
 
     if (!items.length) {
-        container.innerHTML = `
-            <p class="empty-message">You haven't submitted anything yet.
-            <a href="contribute.html">Answer a claim or share a source →</a></p>`;
+        container.innerHTML = `<p class="empty-message">${t('tracker.emptyHtml')}</p>`;
         return;
     }
 
     const summary = ['pending', 'approved', 'rejected']
         .filter((s) => counts[s])
-        .map((s) => `<span class="status-chip ${STATUS_META[s].cls}">${STATUS_META[s].icon} ${counts[s]} ${STATUS_META[s].label.toLowerCase()}</span>`)
+        .map((s) => `<span class="status-chip ${STATUS_META[s].cls}">${STATUS_META[s].icon} ${counts[s]} ${escapeHtml(STATUS_META[s].label.toLowerCase())}</span>`)
         .join('');
 
     const rows = items.map((it) => {
         const meta = STATUS_META[it.status] || STATUS_META.pending;
         const kind = it.kind === 'source'
-            ? `<span class="tracker-kind">${icon('book')} Source</span>`
-            : `<span class="tracker-kind">${icon('message')} Response</span>`;
+            ? `<span class="tracker-kind">${icon('book')} ${escapeHtml(t('tracker.source'))}</span>`
+            : `<span class="tracker-kind">${icon('message')} ${escapeHtml(t('tracker.response'))}</span>`;
         const when = it.submitted_at
-            ? `<time datetime="${escapeHtml(it.submitted_at)}">${new Date(it.submitted_at).toLocaleDateString()}</time>`
+            ? `<time datetime="${escapeHtml(it.submitted_at)}">${escapeHtml(formatDate(it.submitted_at))}</time>`
             : '—';
-        const link = it.url
-            ? `<a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(it.title)}</a>`
-            : escapeHtml(it.title);
+        // Answers link to their claim page (`href`, once published); sources to the source.
+        const inner = safeHref(it.href)
+            || (it.kind !== 'source' && it.argument_id != null && it.status === 'approved' ? `argument.html?id=${encodeURIComponent(it.argument_id)}` : null);
+        const link = inner
+            ? `<a href="${escapeHtml(inner)}">${escapeHtml(it.title)}</a>`
+            : safeHref(it.url)
+                ? `<a href="${escapeHtml(safeHref(it.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(it.title)}</a>`
+                : escapeHtml(it.title);
         return `
             <tr>
-                <td data-label="Type">${kind}</td>
-                <td data-label="What">${link}</td>
-                <td data-label="Sent">${when}</td>
-                <td data-label="Status"><span class="status-chip ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></td>
+                <td data-label="${escapeHtml(t('tracker.colType'))}">${kind}</td>
+                <td data-label="${escapeHtml(t('tracker.colWhat'))}">${link}</td>
+                <td data-label="${escapeHtml(t('tracker.colSent'))}">${when}</td>
+                <td data-label="${escapeHtml(t('tracker.colStatus'))}"><span class="status-chip ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></td>
             </tr>`;
     }).join('');
 
@@ -906,7 +939,7 @@ function renderContributionStatus(items, counts) {
         <div class="table-scroll">
             <table class="status-table">
                 <thead>
-                    <tr><th scope="col">Type</th><th scope="col">What</th><th scope="col">Sent</th><th scope="col">Status</th></tr>
+                    <tr>${['tracker.colType', 'tracker.colWhat', 'tracker.colSent', 'tracker.colStatus'].map((k) => `<th scope="col">${escapeHtml(t(k))}</th>`).join('')}</tr>
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
@@ -924,12 +957,13 @@ async function loadRecommendations() {
             // Credentialed so the API can flag claims we authored or already answered.
             fetch(`${API_BASE_URL}/arguments`, { credentials: 'include' }),
         ]);
+        if (tagsRes.status === 401) return goToLogin();
         const followed = tagsRes.ok ? (await tagsRes.json()).followed_tags.map((t) => t.tag) : [];
         const args = argsRes.ok ? await argsRes.json() : [];
         renderRecommendations(Array.isArray(args) ? args : [], followed);
     } catch (error) {
         console.error('Recommendations error:', error);
-        container.innerHTML = '<p class="empty-message">Couldn\'t load recommendations right now.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('reco.loadError'))}</p>`;
     }
 }
 
@@ -941,8 +975,8 @@ function renderRecommendations(args, followedTags) {
     // profiling: this single action powers the whole section).
     if (!followedTags.length) {
         container.innerHTML = `
-            <p class="empty-message">Tell us which topics you care about and we'll suggest claims to work on.
-            <button type="button" class="btn btn-secondary btn-small" id="recAddTags">+ Choose topics</button></p>`;
+            <p class="empty-message">${escapeHtml(t('reco.pickTopics'))}
+            <button type="button" class="btn btn-secondary btn-small" id="recAddTags">${escapeHtml(t('reco.pickTopicsBtn'))}</button></p>`;
         document.getElementById('recAddTags')?.addEventListener('click', openTagSelector);
         return;
     }
@@ -967,43 +1001,33 @@ function renderRecommendations(args, followedTags) {
         .slice(0, 3);
 
     if (!scored.length) {
-        container.innerHTML = `
-            <p class="empty-message">No open claims in your topics right now — nice work.
-            <a href="index.html">Browse all claims →</a></p>`;
+        container.innerHTML = `<p class="empty-message">${t('reco.noneHtml')}</p>`;
         return;
     }
 
     container.innerHTML = '';
     scored.forEach(({ a, matched }) => {
         const count = a.counter_argument_count || 0;
-        const why = `Because you follow ${matched.slice(0, 2).map((t) => `#${escapeHtml(t)}`).join(' ')}`;
+        const why = escapeHtml(t('reco.because', { tags: matched.slice(0, 2).map(topicLabel).join(', ') }));
         const urgencyNote = count === 0
-            ? `<span class="needs-badge needs-badge-hot">${icon('zap')} No response yet</span>`
-            : `<span class="needs-badge">${count} response${count === 1 ? '' : 's'}</span>`;
+            ? `<span class="needs-badge needs-badge-hot">${icon('zap')} ${escapeHtml(t('reco.noResponse'))}</span>`
+            : `<span class="needs-badge">${escapeHtml(t('reco.responses', { n: count }))}</span>`;
 
         const card = document.createElement('a');
         card.className = 'needs-card';
         card.href = `argument.html?id=${encodeURIComponent(a.id)}`;
         card.innerHTML = `
             <p class="rec-why">${icon('target')} ${why}</p>
-            <p class="needs-quote">"${formatClaimText(a.text)}"</p>
+            <p class="needs-quote">${quotedClaimHtml(a.text)}</p>
             <div class="needs-meta">${urgencyNote}</div>
-            <span class="needs-cta">${count === 0 ? `${icon('pen')} Be the first to respond →` : `${icon('message')} Add your response →`}</span>`;
+            <span class="needs-cta">${count === 0 ? `${icon('pen')} ${escapeHtml(t('reco.beFirst'))}` : `${icon('message')} ${escapeHtml(t('reco.addYours'))}`}</span>`;
         container.appendChild(card);
     });
 }
 
 // ---- Activity from people you follow ----
 function timeAgo(iso) {
-    const then = new Date(iso).getTime();
-    if (!then) return '';
-    const secs = Math.max(1, Math.floor((Date.now() - then) / 1000));
-    const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
-    for (const [name, s] of units) {
-        const v = Math.floor(secs / s);
-        if (v >= 1) return `${v} ${name}${v === 1 ? '' : 's'} ago`;
-    }
-    return 'just now';
+    return formatTimeAgo(iso);
 }
 
 async function loadFollowingActivity() {
@@ -1012,39 +1036,53 @@ async function loadFollowingActivity() {
 
     try {
         const res = await fetch(`${API_BASE_URL}/me/following-activity`, { credentials: 'include' });
+        if (res.status === 401) return goToLogin();
         if (!res.ok) throw new Error(`Request failed: ${res.status}`);
         const data = await res.json();
         renderFollowingActivity(data.items || []);
     } catch (error) {
         console.error('Following activity error:', error);
-        container.innerHTML = '<p class="empty-message">Couldn\'t load activity right now.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('activity.loadError'))}</p>`;
     }
 }
 
 const ACTIVITY_ICON = { response: icon('message'), source: icon('book') };
+// The API sends an English verb; show ours, keyed by that verb (or the kind).
+const ACTIVITY_VERB_KEYS = {
+    'answered a claim': 'activity.answeredClaim',
+    'wrote a response': 'activity.wroteResponse',
+    'shared a source': 'activity.sharedSource',
+};
+const ACTIVITY_VERB_CODES = {
+    wrote_response: 'activity.wroteResponse',
+    shared_source: 'activity.sharedSource',
+};
+function activityVerb(it) {
+    const key = ACTIVITY_VERB_CODES[it.verb_code] || ACTIVITY_VERB_KEYS[it.verb]
+        || (it.kind === 'source' ? 'activity.sharedSource' : 'activity.wroteResponse');
+    return t(key);
+}
 
 function renderFollowingActivity(items) {
     const container = document.getElementById('followingActivityContent');
     if (!container) return;
 
     if (!items.length) {
-        container.innerHTML = `
-            <p class="empty-message">No recent activity from people you follow.
-            <a href="index.html">Find people to follow →</a></p>`;
+        container.innerHTML = `<p class="empty-message">${t('activity.emptyHtml')}</p>`;
         return;
     }
 
     container.innerHTML = items.map((it) => {
         const kindIcon = ACTIVITY_ICON[it.kind] || '•';
         const who = `<a href="profile.html?id=${encodeURIComponent(it.user.id)}" class="activity-user">${escapeHtml(it.user.username)}</a>`;
-        const what = it.href
-            ? `<a href="${escapeHtml(it.href)}"${it.kind === 'source' ? ' target="_blank" rel="noopener noreferrer"' : ''}>"${escapeHtml(it.title)}"</a>`
-            : `"${escapeHtml(it.title)}"`;
+        const what = safeHref(it.href)
+            ? `<a href="${escapeHtml(safeHref(it.href))}"${it.kind === 'source' ? ' target="_blank" rel="noopener noreferrer"' : ''}>“${escapeHtml(it.title)}”</a>`
+            : `“${escapeHtml(it.title)}”`;
         const when = it.at ? `<time datetime="${escapeHtml(it.at)}" class="activity-time">${escapeHtml(timeAgo(it.at))}</time>` : '';
         return `
             <div class="activity-item">
                 <span class="activity-icon" aria-hidden="true">${kindIcon}</span>
-                <p class="activity-text">${who} ${escapeHtml(it.verb)} ${what}</p>
+                <p class="activity-text">${who} ${escapeHtml(activityVerb(it))} ${what}</p>
                 ${when}
             </div>`;
     }).join('');
@@ -1064,10 +1102,11 @@ async function loadProfileData() {
         
         // Update profile header
         document.getElementById('profileUsername').textContent = data.user.username;
-        document.getElementById('profileRole').textContent = data.user.role;
+        document.getElementById('profileRole').textContent = userRoleLabel(data.user.role);
         document.getElementById('profileRole').className = `role-badge ${data.user.role}`;
-        document.getElementById('profileMemberSince').innerHTML =
-            `Member since <time datetime="${escapeHtml(data.user.created_at)}">${escapeHtml(new Date(data.user.created_at).toLocaleDateString())}</time>`;
+        document.getElementById('profileMemberSince').innerHTML = t('profile.memberSinceHtml', {
+            date: `<time datetime="${escapeHtml(data.user.created_at)}">${escapeHtml(formatDate(data.user.created_at))}</time>`,
+        });
 
         // Profile picture (works for own and other profiles)
         renderProfileAvatar(data.user);
@@ -1093,11 +1132,11 @@ async function loadProfileData() {
         displayProfileContributions(data.contributions || []);
         
         // Update page title
-        document.title = `${data.user.username} - re.inform`;
+        document.title = t('site.pageTitle', { page: data.user.username });
         
     } catch (error) {
         console.error('Error loading profile:', error);
-        document.getElementById('profileUsername').textContent = 'User not found';
+        document.getElementById('profileUsername').textContent = t('profile.notFound');
     }
 }
 
@@ -1106,11 +1145,11 @@ function updateFollowButton() {
     if (!btn) return;
     
     if (isFollowingProfile) {
-        btn.textContent = 'Unfollow';
+        btn.textContent = t('profile.unfollow');
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-secondary');
     } else {
-        btn.textContent = 'Follow';
+        btn.textContent = t('profile.follow');
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-primary');
     }
@@ -1129,7 +1168,7 @@ function renderProfileAvatar(user) {
     if (initials) initials.textContent = initial;
 
     let img = document.getElementById('profileAvatarImg');
-    if (user.avatar_url) {
+    if (safeHref(user.avatar_url)) {
         if (!img) {
             img = document.createElement('img');
             img.id = 'profileAvatarImg';
@@ -1137,7 +1176,7 @@ function renderProfileAvatar(user) {
             img.onerror = () => img.remove();
             wrap.appendChild(img);
         }
-        img.src = user.avatar_url;
+        img.src = safeHref(user.avatar_url);
     } else if (img) {
         img.remove();
     }
@@ -1157,7 +1196,7 @@ function setupAvatarControls() {
 
     changeBtn.addEventListener('click', () => {
         if (!currentUser) {
-            window.location.href = 'login.html';
+            goToLogin();
             return;
         }
         errorEl.style.display = 'none';
@@ -1176,7 +1215,7 @@ function setupAvatarControls() {
 
         const originalText = changeBtn.textContent;
         changeBtn.disabled = true;
-        changeBtn.textContent = 'Uploading…';
+        changeBtn.textContent = t('profile.uploading');
 
         try {
             const res = await fetch(`${API_BASE_URL}/me/avatar`, {
@@ -1186,7 +1225,7 @@ function setupAvatarControls() {
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                errorEl.textContent = data.error || 'Upload failed.';
+                errorEl.textContent = apiError(data, 'profile.uploadFailed');
                 errorEl.style.display = 'block';
                 return;
             }
@@ -1198,7 +1237,7 @@ function setupAvatarControls() {
             });
         } catch (error) {
             console.error('Avatar upload error:', error);
-            errorEl.textContent = 'Upload failed. Please try again.';
+            errorEl.textContent = t('profile.uploadRetry');
             errorEl.style.display = 'block';
         } finally {
             changeBtn.disabled = false;
@@ -1209,7 +1248,7 @@ function setupAvatarControls() {
 
 async function toggleFollow() {
     if (!currentUser) {
-        window.location.href = 'login.html';
+        goToLogin();
         return;
     }
     
@@ -1222,6 +1261,8 @@ async function toggleFollow() {
             method: method,
             credentials: 'include'
         });
+        
+        if (response.status === 401) return goToLogin();
         
         if (response.ok) {
             isFollowingProfile = !isFollowingProfile;
@@ -1243,17 +1284,17 @@ function displayEndorsements(endorsements) {
     const container = document.getElementById('endorsementsList');
     
     if (!endorsements || endorsements.length === 0) {
-        container.innerHTML = '<p class="empty-message">No endorsements yet.</p>';
+        container.innerHTML = `<p class="empty-message">${escapeHtml(t('profile.endorsementsEmpty'))}</p>`;
         return;
     }
     
     container.innerHTML = endorsements.map(e => `
         <div class="endorsement-card">
             <div class="endorser">
-                <a href="profile.html?id=${e.endorser_id}" class="contributor-link">${e.endorser_username}</a>
+                <a href="profile.html?id=${encodeURIComponent(e.endorser_id)}" class="contributor-link">${escapeHtml(e.endorser_username)}</a>
             </div>
-            <div class="reason">"${e.reason}"</div>
-            <div class="date">${new Date(e.created_at).toLocaleDateString()}</div>
+            <div class="reason">“${escapeHtml(e.reason)}”</div>
+            <div class="date">${escapeHtml(formatDate(e.created_at))}</div>
         </div>
     `).join('');
 }
@@ -1262,9 +1303,9 @@ function displayProfileContributions(contributions) {
     const container = document.getElementById('contributionsList');
     
     if (contributions.length === 0) {
-        const message = isOwnProfile 
-            ? 'No contributions yet. <a href="contribute.html">Write your first response!</a>'
-            : 'No contributions yet.';
+        const message = isOwnProfile
+            ? t('profile.contributionsEmptyMineHtml')
+            : escapeHtml(t('profile.contributionsEmpty'));
         container.innerHTML = `<p class="empty-message">${message}</p>`;
         return;
     }
@@ -1288,12 +1329,13 @@ async function loadFollowedTags() {
             credentials: 'include'
         });
         
+        if (response.status === 401) return goToLogin();
         if (!response.ok) throw new Error('Failed to load followed tags');
         
         const data = await response.json();
         
         if (data.followed_tags.length === 0) {
-            container.innerHTML = '<p class="empty-message">You\'re not following any tags yet. Click "Add tags" to get started!</p>';
+            container.innerHTML = `<p class="empty-message">${escapeHtml(t('profile.tagsEmptyLong'))}</p>`;
             return;
         }
         
@@ -1305,12 +1347,12 @@ async function loadFollowedTags() {
             const link = document.createElement('a');
             link.className = 'followed-tag-link';
             link.href = `resources.html?tag=${encodeURIComponent(tag)}`;
-            link.textContent = `#${tag}`;
+            link.textContent = topicLabel(tag);
 
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'tag-remove';
-            removeBtn.title = 'Unfollow';
+            removeBtn.title = t('profile.unfollow');
             removeBtn.textContent = '×';
             removeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -1325,7 +1367,7 @@ async function loadFollowedTags() {
         
     } catch (error) {
         console.error('Error loading followed tags:', error);
-        container.innerHTML = '<p class="error-message">Failed to load tags.</p>';
+        container.innerHTML = `<p class="error-message">${escapeHtml(t('profile.tagsLoadError'))}</p>`;
     }
 }
 
@@ -1335,6 +1377,8 @@ async function unfollowTag(tag) {
             method: 'DELETE',
             credentials: 'include'
         });
+        
+        if (response.status === 401) return goToLogin();
         
         if (response.ok) {
             await loadFollowedTags();
@@ -1352,6 +1396,8 @@ async function followTag(tag) {
             credentials: 'include',
             body: JSON.stringify({ tag: tag })
         });
+        
+        if (response.status === 401) return goToLogin();
         
         if (response.ok) {
             await loadFollowedTags();
@@ -1380,6 +1426,7 @@ async function openTagSelector() {
             fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, { credentials: 'include' })
         ]);
 
+        if (followedResponse.status === 401) return goToLogin();
         const tagsData = await tagsResponse.json();
         const followedData = await followedResponse.json();
         const followedSet = new Set(followedData.followed_tags.map(t => t.tag));
@@ -1391,7 +1438,7 @@ async function openTagSelector() {
                 data-tag="${escapeHtml(tag)}"
                 aria-pressed="${followedSet.has(tag) ? 'true' : 'false'}"
             >
-                #${escapeHtml(tag)}
+                ${escapeHtml(topicLabel(tag))}
             </button>
         `).join('');
 
@@ -1406,7 +1453,7 @@ async function openTagSelector() {
         }
     } catch (error) {
         console.error('Error loading tags:', error);
-        grid.innerHTML = '<p class="error-message">Failed to load tags.</p>';
+        grid.innerHTML = `<p class="error-message">${escapeHtml(t('profile.tagsLoadError'))}</p>`;
     }
 
     modal.style.display = 'flex';
@@ -1451,12 +1498,13 @@ async function loadFollowingProfiles() {
             credentials: 'include'
         });
         
+        if (response.status === 401) return goToLogin();
         if (!response.ok) throw new Error('Failed to load following');
         
         const data = await response.json();
         
         if (data.following.length === 0) {
-            container.innerHTML = '<p class="empty-message">You\'re not following anyone yet. Visit contributor profiles to follow them!</p>';
+            container.innerHTML = `<p class="empty-message">${escapeHtml(t('profile.followingEmptyLong'))}</p>`;
             return;
         }
         
@@ -1464,9 +1512,9 @@ async function loadFollowingProfiles() {
             <div class="user-card">
                 <a href="profile.html?id=${encodeURIComponent(user.id)}" class="user-card-link">
                     <div class="user-card-name">${escapeHtml(user.username)}</div>
-                    <span class="role-badge ${escapeHtml(user.role)}">${escapeHtml(user.role)}</span>
+                    <span class="role-badge ${escapeHtml(user.role)}">${escapeHtml(userRoleLabel(user.role))}</span>
                 </a>
-                <button type="button" class="btn btn-secondary btn-small" data-unfollow="${encodeURIComponent(user.id)}">Unfollow</button>
+                <button type="button" class="btn btn-secondary btn-small" data-unfollow="${encodeURIComponent(user.id)}">${escapeHtml(t('profile.unfollow'))}</button>
             </div>
         `).join('');
 
@@ -1481,7 +1529,7 @@ async function loadFollowingProfiles() {
 
     } catch (error) {
         console.error('Error loading following:', error);
-        container.innerHTML = '<p class="error-message">Failed to load following.</p>';
+        container.innerHTML = `<p class="error-message">${escapeHtml(t('profile.followingLoadError'))}</p>`;
     }
 }
 
@@ -1491,6 +1539,8 @@ async function unfollowUser(userId) {
             method: 'DELETE',
             credentials: 'include'
         });
+        
+        if (response.status === 401) return goToLogin();
         
         if (response.ok) {
             await loadFollowingProfiles();
@@ -1512,29 +1562,35 @@ async function unfollowUser(userId) {
 const REPO_URL = 'https://github.com/LucieRC/re.inform';
 
 const CONTRIBUTOR_PROFILES = [
-    { id: 'quick', icon: 'clock', title: 'I have a few minutes', who: 'Anyone — no expertise needed', tasks: ['prioritize', 'rate', 'claim'] },
-    { id: 'talk', icon: 'message', title: 'I discuss these topics with people around me', who: 'Family, friends, colleagues, online', tasks: ['claim', 'answer', 'personas'] },
-    { id: 'science', icon: 'flask', title: "I'm comfortable with science and sources", who: 'Researcher, student, fact-checker', tasks: ['review', 'resource', 'answer'] },
-    { id: 'write', icon: 'pen', title: 'I write, teach or communicate', who: 'Journalist, teacher, activist', tasks: ['answer', 'improve', 'personas'] },
-    { id: 'visual', icon: 'palette', title: 'I design or illustrate', who: 'Graphic designer, illustrator', tasks: ['visual', 'personas'] },
-    { id: 'tech', icon: 'code', title: 'I code or work with data', who: 'Developer, data scientist', tasks: ['code', 'data'] },
-];
+    { id: 'quick', icon: 'clock', tasks: ['prioritize', 'rate', 'claim'] },
+    { id: 'talk', icon: 'message', tasks: ['claim', 'answer', 'personas'] },
+    { id: 'science', icon: 'flask', tasks: ['review', 'resource', 'answer'] },
+    { id: 'write', icon: 'pen', tasks: ['answer', 'improve', 'personas'] },
+    { id: 'visual', icon: 'palette', tasks: ['visual', 'personas'] },
+    { id: 'tech', icon: 'code', tasks: ['code', 'data'] },
+].map((p) => ({ ...p, title: t(`who.${p.id}.title`), who: t(`who.${p.id}.who`) }));
 
 // `open` reveals a workspace on this page; `href` (or `hrefFrom`, computed once
 // claims are loaded) leads to where the work happens.
-const CONTRIBUTOR_TASKS = {
-    prioritize: { icon: 'target', title: 'Vote on the claims you hear most', desc: 'One tap per claim. It decides what gets answered first.', time: '1 min', account: false, open: 'ws-prioritize' },
-    rate: { icon: 'star', title: 'Rate an answer', desc: 'Read a response and say whether it would convince the person it targets.', time: '30 sec', account: false, hrefFrom: 'unrated' },
-    claim: { icon: 'plus', title: "Add a claim you've heard", desc: 'Just the sentence. No source or answer needed.', time: '1 min', account: true, open: 'ws-claim' },
-    answer: { icon: 'message', title: 'Answer a claim for a specific person', desc: 'Pick a claim and a persona that has no answer yet. A few sentences are enough.', time: '5 min', account: true, open: 'ws-answer' },
-    personas: { icon: 'users', title: 'Get to know the personas', desc: 'Five kinds of people you may talk to, and what moves each of them.', time: '5 min', account: false, href: 'personalities.html' },
-    review: { icon: 'search', title: 'Fact-check the answers to a claim', desc: 'Check the sources, rate the answers, and propose a corrected version if something is off.', time: '10 min', account: true, hrefFrom: 'review' },
-    resource: { icon: 'book', title: 'Share a study, article or report', desc: 'Add evidence to the shared library so anyone can cite it.', time: '2 min', account: true, open: 'ws-resource' },
-    improve: { icon: 'pen', title: 'Make an existing answer more convincing', desc: 'Open a claim and use “Propose an improved response” on an answer that sounds too dry or too preachy.', time: '10 min', account: true, hrefFrom: 'review' },
-    visual: { icon: 'image', title: 'Turn an answer into a visual', desc: 'Infographics travel further than text. Make one, then share its link in the library.', time: '1 h+', account: true, open: 'ws-resource' },
-    code: { icon: 'code', title: 'Improve the website', desc: 'Flask + plain JavaScript. Pick an open issue or propose your own on GitHub.', time: 'Flexible', account: false, href: `${REPO_URL}/issues`, external: true },
-    data: { icon: 'chart', title: 'Work on the persona research', desc: 'Personas are built from European Values Study survey data with a Python pipeline. Help refine the method.', time: 'Flexible', account: false, href: REPO_URL, external: true },
-};
+const CONTRIBUTOR_TASKS = Object.fromEntries(Object.entries({
+    // Voting, rating and answering happen in the home page's « Aider » mode.
+    prioritize: { icon: 'target', account: false, href: 'index.html?mode=help&task=vote' },
+    rate: { icon: 'star', account: false, href: 'index.html?mode=help&task=rate' },
+    claim: { icon: 'plus', account: true, href: 'index.html?add=1' },
+    answer: { icon: 'message', account: true, href: 'index.html?mode=help&task=write' },
+    personas: { icon: 'users', account: false, href: 'personalities.html' },
+    review: { icon: 'search', account: true, hrefFrom: 'review' },
+    resource: { icon: 'book', account: true, open: 'ws-resource' },
+    improve: { icon: 'pen', account: true, hrefFrom: 'review' },
+    visual: { icon: 'image', account: true, open: 'ws-resource' },
+    code: { icon: 'code', account: false, href: `${REPO_URL}/issues`, external: true },
+    data: { icon: 'chart', account: false, href: REPO_URL, external: true },
+}).map(([id, task]) => [id, {
+    ...task,
+    title: t(`task.${id}.title`),
+    desc: t(`task.${id}.desc`),
+    time: t(`task.${id}.time`),
+}]));
 
 const PROFILE_STORAGE_KEY = 'reinform.contributorProfile';
 const contributeState = { args: [], archetypes: [], profileId: null, taskId: null };
@@ -1597,27 +1653,27 @@ function selectContributorProfile(profileId, { scroll = false } = {}) {
 }
 
 function createTaskCard(taskId, isFirst) {
-    const t = CONTRIBUTOR_TASKS[taskId];
-    const el = document.createElement(t.open ? 'button' : 'a');
+    const task = CONTRIBUTOR_TASKS[taskId];
+    const el = document.createElement(task.open ? 'button' : 'a');
     el.className = `help-path${isFirst ? ' help-path-primary' : ''}`;
     el.dataset.task = taskId;
-    if (t.open) {
+    if (task.open) {
         el.type = 'button';
-        el.setAttribute('aria-controls', t.open);
+        el.setAttribute('aria-controls', task.open);
         el.setAttribute('aria-expanded', 'false');
         el.addEventListener('click', () => openContributorTask(taskId));
     } else {
-        el.href = taskHref(t);
-        if (t.external) { el.target = '_blank'; el.rel = 'noopener noreferrer'; }
+        el.href = taskHref(task);
+        if (task.external) { el.target = '_blank'; el.rel = 'noopener noreferrer'; }
     }
-    const accountTag = t.account && !currentUser ? ' · free account' : '';
+    const accountTag = task.account && !currentUser ? t('contribute.freeAccount') : '';
     el.innerHTML = `
-        <span class="help-path-icon">${icon(t.icon)}</span>
+        <span class="help-path-icon">${icon(task.icon)}</span>
         <span class="help-path-body">
-            <span class="help-path-title">${escapeHtml(t.title)}</span>
-            <span class="help-path-desc">${escapeHtml(t.desc)}</span>
+            <span class="help-path-title">${escapeHtml(task.title)}</span>
+            <span class="help-path-desc">${escapeHtml(task.desc)}</span>
         </span>
-        <span class="help-path-effort">${escapeHtml(t.time + accountTag)}</span>
+        <span class="help-path-effort">${escapeHtml(task.time + accountTag)}</span>
     `;
     return el;
 }
@@ -1648,11 +1704,9 @@ function openContributorTask(taskId) {
     // Logged out: say so up front, with a way back to exactly this task.
     const hint = ws.querySelector('.onb-login-hint');
     if (hint) {
-        hint.innerHTML = currentUser ? '' : task.account ? `
-            <p class="onb-account onb-account-inline">You'll need a free account to save this.
-                <a href="${authHref('register.html')}">Create one</a> or <a href="${authHref('login.html')}">log in</a> — you'll come back right here.</p>` : `
-            <p class="onb-account onb-account-inline">No account needed to vote. Your votes are saved, and they count once you
-                <a href="${authHref('register.html')}">create a free account</a>.</p>`;
+        const links = { registerHref: authHref('register.html'), loginHref: authHref('login.html') };
+        hint.innerHTML = currentUser ? '' : `
+            <p class="onb-account onb-account-inline">${t(task.account ? 'contribute.needAccountHtml' : 'contribute.voteNoAccountHtml', links)}</p>`;
     }
 
     syncContributeUrl();
@@ -1667,11 +1721,12 @@ function closeContributorWorkspaces() {
 }
 
 function syncContributeUrl() {
-    const params = new URLSearchParams();
-    if (contributeState.profileId) params.set('as', contributeState.profileId);
-    if (contributeState.taskId) params.set('task', contributeState.taskId);
-    const qs = params.toString();
-    history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    // Keep the page's other parameters (e.g. a profile ?id=).
+    const url = new URL(window.location.href);
+    const set = (key, value) => (value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+    set('as', contributeState.profileId);
+    set('task', contributeState.taskId);
+    history.replaceState(null, '', url);
     // Login links on this page should bring the user back to the same profile and task.
     document.querySelectorAll('[data-auth]').forEach((a) => { a.href = authHref(a.dataset.auth); });
 }
@@ -1686,7 +1741,7 @@ async function loadContributeData() {
         const args = argsRes.ok ? await argsRes.json() : [];
         const personas = personaRes.ok ? await personaRes.json() : [];
         contributeState.args = Array.isArray(args) ? args : [];
-        contributeState.archetypes = (Array.isArray(personas) ? personas : []).filter((p) => p && p.layer === 'archetype');
+        contributeState.archetypes = (Array.isArray(personas) ? personas : []).filter((p) => isActivePersona(p) && p.layer === 'archetype');
     } catch (error) {
         console.error('Contribute data error:', error);
     }
@@ -1715,20 +1770,20 @@ function renderAnswerGaps() {
         .slice(0, 6);
 
     if (!gaps.length) {
-        el.innerHTML = '<p class="empty-message">Every claim has an answer for every persona right now. <a href="index.html">Browse the claims</a> to improve one.</p>';
+        el.innerHTML = `<p class="empty-message">${t('contribute.gapsEmptyHtml')}</p>`;
         return;
     }
 
     el.innerHTML = gaps.map(({ a, missing }) => `
         <div class="needs-card">
-            <p class="needs-quote">"${formatClaimText(a.text)}"</p>
+            <p class="needs-quote">${quotedClaimHtml(a.text)}</p>
             <div class="onb-gap-links">
                 ${missing.slice(0, 3).map((p) => `
-                    <a class="gap-chip" href="argument.html?id=${encodeURIComponent(a.id)}&amp;write=${encodeURIComponent(p.id)}">${icon('pen')} For ${escapeHtml(p.name)}</a>
+                    <a class="gap-chip" href="argument.html?id=${encodeURIComponent(a.id)}&amp;write=${encodeURIComponent(p.id)}">${icon('pen')} ${escapeHtml(t('contribute.gapFor', { name: p.name }))}</a>
                 `).join('')}
             </div>
         </div>
-    `).join('') + '<p class="onb-more"><a href="index.html">See all claims →</a></p>';
+    `).join('') + `<p class="onb-more"><a href="index.html">${escapeHtml(t('contribute.seeAll'))}</a></p>`;
 }
 
 // Home feed: the "Heard a claim…" prompt opens the claim form in place.
@@ -1744,7 +1799,7 @@ function setupFeedComposer() {
         form.hidden = false;
         // Logged out: say so up front rather than after they've typed.
         if (!currentUser && !messageEl.textContent) {
-            messageEl.innerHTML = `You'll need a free account to post. <a href="${authHref('register.html')}">Create one</a> or <a href="${authHref('login.html')}">log in</a> — you'll come back right here.`;
+            messageEl.innerHTML = t('claimForm.needAccountHtml', { registerHref: authHref('register.html'), loginHref: authHref('login.html') });
             messageEl.className = 'form-message';
         }
         form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1779,6 +1834,8 @@ function setupFeedComposer() {
     document.getElementById('feedComposerCancel').addEventListener('click', () => close());
     document.querySelectorAll('[data-open-composer]').forEach((b) => b.addEventListener('click', open));
     setupClaimForm('feedComposer');
+    // ?add=1 (e.g. from the profile's "Add a claim" task) opens it straight away.
+    if (new URLSearchParams(window.location.search).get('add')) open();
 }
 
 function setupClaimForm(formId = 'claimForm') {
@@ -1794,7 +1851,7 @@ function setupClaimForm(formId = 'claimForm') {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!currentUser) {
-            showMessage(`Please <a href="${authHref('register.html')}">create a free account</a> or <a href="${authHref('login.html')}">log in</a> first.`, 'error');
+            showMessage(t('claimForm.loginFirstHtml', { registerHref: authHref('register.html'), loginHref: authHref('login.html') }), 'error');
             return;
         }
         const text = document.getElementById('claimText').value.trim();
@@ -1810,15 +1867,17 @@ function setupClaimForm(formId = 'claimForm') {
             });
             const data = await response.json();
             if (!response.ok) {
-                showMessage(escapeHtml(data.error || 'Could not add the claim.'), 'error');
+                showMessage(data?.code === 'auth_required'
+                    ? t('claimForm.loginFirstHtml', { registerHref: authHref('register.html'), loginHref: authHref('login.html') })
+                    : escapeHtml(apiError(data, 'claimForm.error')), 'error');
                 return;
             }
             form.reset();
             const id = encodeURIComponent(data.argument?.id);
-            showMessage(`Thanks, the claim is online. <a href="argument.html?id=${id}">See it</a> or <a href="argument.html?id=${id}&amp;write=any">write a first answer →</a>`, 'success');
+            showMessage(t('claimForm.successHtml', { href: `argument.html?id=${id}`, writeHref: `argument.html?id=${id}&amp;write=any` }), 'success');
         } catch (error) {
             console.error('Claim submission error:', error);
-            showMessage('Could not reach the server. Please try again.', 'error');
+            showMessage(escapeHtml(t('common.serverUnreachable')), 'error');
         } finally {
             submitBtn.disabled = false;
         }
@@ -1831,17 +1890,23 @@ function setupClaimForm(formId = 'claimForm') {
 
 // Three levels, stored on the 1..5 scale the rating store already speaks.
 const PRIORITY_LEVELS = [
-    { score: 1, label: 'Low', hint: 'Rarely comes up' },
-    { score: 3, label: 'Medium', hint: 'Worth covering' },
-    { score: 5, label: 'Critical', hint: 'Debunk this first' },
+    { score: 1, label: t('priority.low'), hint: t('priority.lowHint') },
+    { score: 3, label: t('priority.medium'), hint: t('priority.mediumHint') },
+    { score: 5, label: t('priority.critical'), hint: t('priority.criticalHint') },
 ];
+
+function priorityTally(count, avg) {
+    return count
+        ? t('priority.tally', { n: count, avg: formatNumber(avg, 1) })
+        : t('priority.noRatings');
+}
 
 function renderPriorityList(args) {
     const listEl = document.getElementById('priorityList');
     if (!listEl) return;
 
     if (!args.length) {
-        listEl.innerHTML = '<p class="empty-message">No claims to rate yet.</p>';
+        listEl.innerHTML = `<p class="empty-message">${escapeHtml(t('priority.empty'))}</p>`;
         return;
     }
 
@@ -1864,19 +1929,15 @@ function renderPriorityList(args) {
         row.className = 'priority-row';
         row.dataset.argumentId = a.id;
         row.innerHTML = `
-            <p class="priority-claim">"${formatClaimText(a.text)}"</p>
-            <div class="priority-controls" role="group" aria-label="How urgent is this to debunk?">
+            <p class="priority-claim">${quotedClaimHtml(a.text)}</p>
+            <div class="priority-controls" role="group" aria-label="${escapeHtml(t('priority.groupLabel'))}">
                 ${PRIORITY_LEVELS.map((lvl) => `
                     <button type="button" class="priority-btn${mine === lvl.score ? ' is-selected' : ''}"
                             data-score="${lvl.score}" title="${escapeHtml(lvl.hint)}"
                             aria-pressed="${mine === lvl.score}">${escapeHtml(lvl.label)}</button>
                 `).join('')}
             </div>
-            <span class="priority-tally">${
-                count
-                    ? `${count} rating${count === 1 ? '' : 's'} · avg ${Number(avg).toFixed(1)}/5`
-                    : 'No ratings yet'
-            }</span>
+            <span class="priority-tally">${escapeHtml(priorityTally(count, avg))}</span>
         `;
 
         row.querySelectorAll('.priority-btn').forEach((btn) => {
@@ -1887,8 +1948,10 @@ function renderPriorityList(args) {
     });
 }
 
-async function submitImportanceRating(row, score) {
-    const messageEl = document.getElementById('priorityMessage');
+// `toast`: report the outcome in a toast instead of the page's #priorityMessage
+// (the home feed's vote cards, where a message at the top would be off-screen).
+async function submitImportanceRating(row, score, { toast = false } = {}) {
+    const messageEl = toast ? null : document.getElementById('priorityMessage');
     const showMessage = (text, type, html = false) => {
         if (!messageEl) return;
         if (html) messageEl.innerHTML = text;
@@ -1910,8 +1973,12 @@ async function submitImportanceRating(row, score) {
         const data = await response.json();
 
         if (!response.ok) {
-            const signup = data.needs_account ? ` <a href="${authHref('register.html')}">Create a free account</a>` : '';
-            showMessage(escapeHtml(data.error || 'Could not save your rating.') + signup, 'error', true);
+            const signup = data.needs_account ? ` <a href="${authHref('register.html')}">${escapeHtml(t('common.createFreeAccount'))}</a>` : '';
+            showMessage(escapeHtml(apiError(data, 'priority.error')) + signup, 'error', true);
+            if (toast) {
+                showToast(apiError(data, 'priority.error'), data.needs_account
+                    ? { actionLabel: t('common.createAccount'), actionHref: authHref('register.html'), duration: 8000 } : {});
+            }
             return;
         }
 
@@ -1925,19 +1992,23 @@ async function submitImportanceRating(row, score) {
         const count = data.importance?.count || 0;
         const avg = data.importance?.avg_score;
         if (tally) {
-            tally.textContent = count
-                ? `${count} rating${count === 1 ? '' : 's'} · avg ${Number(avg).toFixed(1)}/5`
-                : 'No ratings yet';
+            tally.textContent = priorityTally(count, avg);
         }
         if (data.pending) {
             pendingVotes = data.pending_count;
             showMessage(pendingVotesHtml(data.pending_count), 'success', true);
+            if (toast) {
+                showToast(t('votes.pendingToast', { n: data.pending_count }),
+                    { actionLabel: t('common.createAccount'), actionHref: authHref('register.html'), duration: 8000 });
+            }
         } else {
-            showMessage('Thanks — your rating helps set the priorities.', 'success');
+            showMessage(t('priority.thanks'), 'success');
+            if (toast) showToast(t('priority.thanks'));
         }
     } catch (error) {
         console.error('Importance rating error:', error);
-        showMessage('Could not reach the server. Please try again.', 'error');
+        showMessage(t('common.serverUnreachable'), 'error');
+        if (toast) showToast(t('common.serverUnreachable'));
     } finally {
         buttons.forEach((b) => { b.disabled = false; });
     }
@@ -1952,7 +2023,7 @@ function populateResourceClaimPicker(args) {
     if (!select) return;
 
     args.slice()
-        .sort((a, b) => String(a.text || '').localeCompare(String(b.text || '')))
+        .sort((a, b) => String(a.text || '').localeCompare(String(b.text || ''), LANG))
         .forEach((a) => {
             const option = document.createElement('option');
             option.value = a.id;
@@ -1978,13 +2049,17 @@ function setupResourceForm() {
         e.preventDefault();
 
         if (!currentUser) {
-            showMessage('Please log in to share a resource.', 'error');
+            showMessage(t('resourceForm.loginFirst'), 'error');
             return;
         }
 
         const url = document.getElementById('resourceUrl').value.trim();
         if (!url) {
-            showMessage('Please provide a link.', 'error');
+            showMessage(t('resourceForm.needLink'), 'error');
+            return;
+        }
+        if (!isWebLink(url)) {
+            showMessage(t('composer.sourceInvalid'), 'error');
             return;
         }
 
@@ -2008,15 +2083,15 @@ function setupResourceForm() {
             const data = await response.json();
 
             if (!response.ok) {
-                showMessage(data.error || 'Could not save the resource.', 'error');
+                showMessage(apiError(data, 'resourceForm.error'), 'error');
                 return;
             }
 
             form.reset();
-            showMessage('Thanks — your resource is now in the shared library.', 'success');
+            showMessage(t('resourceForm.success'), 'success');
         } catch (error) {
             console.error('Resource submission error:', error);
-            showMessage('Could not reach the server. Please try again.', 'error');
+            showMessage(t('common.serverUnreachable'), 'error');
         } finally {
             submitBtn.disabled = false;
         }
@@ -2037,16 +2112,20 @@ function createContributionCard(contribution) {
     
     const tagsHTML = contribution.tags && contribution.tags.length > 0
         ? `<div class="card-tags">${contribution.tags.map(tag => 
-            `<span class="tag">${capitalizeWords(tag)}</span>`
+            `<span class="tag">${escapeHtml(topicLabel(tag))}</span>`
           ).join('')}</div>`
         : '';
     
-    const sourceHTML = contribution.source 
-        ? `<div class="card-source"><a href="${contribution.source}" target="_blank" rel="noopener noreferrer">View source</a></div>`
+    const sourceHTML = safeHref(contribution.source)
+        ? `<div class="card-source"><a href="${escapeHtml(safeHref(contribution.source))}" target="_blank" rel="noopener noreferrer">${escapeHtml(t('common.viewSource'))}</a></div>`
         : '';
     
     const dateHTML = contribution.date 
-        ? `<div class="card-date">${new Date(contribution.date).toLocaleDateString()}</div>`
+        ? `<div class="card-date">${escapeHtml(formatDate(contribution.date))}</div>`
+        : '';
+
+    const claimHTML = contribution.argument_id != null
+        ? `<div class="card-source"><a href="argument.html?id=${encodeURIComponent(contribution.argument_id)}">${escapeHtml(t('contrib.viewClaim'))}</a></div>`
         : '';
     
     // Contributor info - show clickable link if user_id exists, otherwise "Anonymous contributor"
@@ -2054,18 +2133,18 @@ function createContributionCard(contribution) {
         ? userAvatarHtml(contribution.user_id, contribution.username, 'avatar-xs')
         : '';
     const contributorHTML = contribution.user_id && contribution.username
-        ? `<a href="profile.html?id=${contribution.user_id}" class="contributor-link">${avatar}<span class="contributor-name">By ${contribution.username}</span></a>`
-        : '<span class="anonymous-contributor">Anonymous contributor</span>';
+        ? `<a href="profile.html?id=${contribution.user_id}" class="contributor-link">${avatar}<span class="contributor-name">${escapeHtml(t('common.by', { name: contribution.username }))}</span></a>`
+        : `<span class="anonymous-contributor">${escapeHtml(t('contrib.anonymous'))}</span>`;
 
     const detailsParts = [];
     if (narrativeText && quoteText !== narrativeText) {
-        detailsParts.push(`<div class="contribution-detail"><strong>Quote:</strong> ${escapeHtml(narrativeText)}</div>`);
+        detailsParts.push(`<div class="contribution-detail"><strong>${escapeHtml(t('contrib.quote'))}</strong> ${escapeHtml(narrativeText)}</div>`);
     }
     if (counterArgumentText && quoteText !== counterArgumentText) {
-        detailsParts.push(`<div class="contribution-detail"><strong>Response:</strong> ${escapeHtml(counterArgumentText)}</div>`);
+        detailsParts.push(`<div class="contribution-detail"><strong>${escapeHtml(t('contrib.response'))}</strong> ${escapeHtml(counterArgumentText)}</div>`);
     }
     if (contribution.title) {
-        detailsParts.push(`<div class="contribution-detail"><strong>Title:</strong> ${escapeHtml(contribution.title)}</div>`);
+        detailsParts.push(`<div class="contribution-detail"><strong>${escapeHtml(t('contrib.title'))}</strong> ${escapeHtml(contribution.title)}</div>`);
     }
     
     card.innerHTML = `
@@ -2079,6 +2158,7 @@ function createContributionCard(contribution) {
             ${tagsHTML}
             <div class="card-meta">
                 <div class="card-contributor">${contributorHTML}</div>
+                ${claimHTML}
                 ${sourceHTML}
                 ${dateHTML}
             </div>
@@ -2133,123 +2213,60 @@ async function initPersonalitiesPage() {
 
         // Layer 1 — archetypes: the named, actionable profiles that pair a value
         // system with a persuasion approach.
-        const archetypes = allArr.filter((p) =>
-            p && (p.layer === 'archetype' || (p.imported_from && p.imported_from.project === 'BonPoteJS'))
-        );
+        const archetypes = allArr.filter((p) => isActivePersona(p)
+            && (p.layer === 'archetype' || (p.imported_from && p.imported_from.project === 'BonPoteJS')));
         renderArchetypesGrid(archetypes);
-
-        // Layer 2 — EVS clusters: population grounding.
-        const evs = allArr
-            .filter((p) => p && p.imported_from && p.imported_from.project === 'EVS');
-
-        evs.sort((a, b) => (Number(b.population_share_w) || 0) - (Number(a.population_share_w) || 0));
 
         if (loadingMessage) loadingMessage.style.display = 'none';
         if (errorMessage) errorMessage.style.display = 'none';
 
+        // Population grounding: each profile's estimated share of the French
+        // population (EVS 2017-2018), largest first.
         if (!grid) return;
-        grid.innerHTML = '';
-
-        if (!evs.length) {
+        const shared = archetypes.filter((p) => Number.isFinite(Number(p.population_share_w)));
+        if (!shared.length) {
             grid.style.display = 'none';
             if (emptyMessage) emptyMessage.style.display = 'block';
             return;
         }
-
-        grid.style.display = 'grid';
         if (emptyMessage) emptyMessage.style.display = 'none';
-
-        function detailsHtml(p) {
-            const name = escapeHtml(String(p?.name || p?.persona_code || 'Personality'));
-            const share = Number(p?.population_share_w);
-            const sharePct = Number.isFinite(share) ? `${(share * 100).toFixed(1)}%` : '';
-
-            const valueSystem = p?.value_system ? escapeHtml(String(p.value_system)) : '';
-            const persuasionFormat = p?.persuasion_format ? escapeHtml(String(p.persuasion_format)) : '';
-            const keywords = Array.isArray(p?.top_axes_labels)
-                ? p.top_axes_labels
-                    .map((x) => escapeHtml(String(x)))
-                    .filter((x) => x)
-                    .slice(0, 6)
-                : [];
-
-            return `
-                <div class="personality-card-header">
-                    <div class="personality-card-name">${name}</div>
-                    <div class="personality-icon-mini">
-                        ${p?.icon
-                            ? `<img class="personality-icon-mini-img" src="${escapeHtml(String(p.icon))}" alt="" loading="lazy" />`
-                            : `<span class="personality-icon-mini-fallback">${escapeHtml(p?.persona_code || 'P')}</span>`
-                        }
-                    </div>
-                </div>
-                <div class="personality-detail-lines">
-                    ${sharePct ? `<div class="personality-detail"><strong>Weight:</strong> ${escapeHtml(sharePct)}</div>` : ''}
-                    ${valueSystem ? `<div class="personality-detail"><strong>Value system:</strong> ${valueSystem}</div>` : ''}
-                    ${persuasionFormat ? `<div class="personality-detail"><strong>♡</strong> ${persuasionFormat}</div>` : ''}
-                    ${keywords.length ? `<div class="personality-detail"><strong>Description:</strong> ${keywords.join(', ')}</div>` : ''}
-                </div>
-            `;
-        }
-
-        evs.forEach((p) => {
-            const iconCard = document.createElement('button');
-            iconCard.type = 'button';
-            iconCard.className = 'counter-argument-card personality-icon-card';
-
-            const name = String(p?.name || p?.persona_code || 'Personality');
-            const code = p?.persona_code ? String(p.persona_code) : '';
-            const label = `${name}`;
-
-            const iconSrc = p?.icon ? escapeHtml(String(p.icon)) : '';
-            iconCard.setAttribute('aria-label', `Toggle details for ${label}`);
-            iconCard.setAttribute('aria-expanded', 'false');
-
-            iconCard.innerHTML = `
-                <div class="personality-card-inner" aria-hidden="false">
-                    <div class="personality-card-flip">
-                        <div class="personality-card-face personality-card-front">
-                            ${iconSrc
-                                ? `<img class="personality-icon-only" src="${iconSrc}" alt="" loading="lazy" />`
-                                : `<span class="personality-icon-fallback">${escapeHtml(code || 'P')}</span>`
-                            }
-                        </div>
-                        <div class="personality-card-face personality-card-back">
-                            <div class="personality-card-details" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const detailsEl = iconCard.querySelector('.personality-card-details');
-            if (detailsEl) {
-                detailsEl.innerHTML = detailsHtml(p);
-            }
-
-            iconCard.addEventListener('click', () => {
-                const expanded = iconCard.classList.contains('is-expanded');
-                iconCard.classList.toggle('is-expanded');
-                iconCard.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-                if (detailsEl) detailsEl.setAttribute('aria-hidden', expanded ? 'true' : 'false');
-            });
-            grid.appendChild(iconCard);
-        });
+        renderPopulationShares(grid, shared);
     } catch (error) {
         console.error('Error loading personalities:', error);
         if (loadingMessage) loadingMessage.style.display = 'none';
         if (errorMessage) {
-            errorMessage.textContent = 'Failed to load personalities. Please try again later.';
+            errorMessage.textContent = t('personas.loadError');
             errorMessage.style.display = 'block';
         }
     }
 }
 
+// Population shares as a list of bars, one per profile, largest first.
+function renderPopulationShares(container, personas) {
+    const max = Math.max(...personas.map((p) => Number(p.population_share_w) || 0)) || 1;
+    container.className = 'population-shares';
+    container.style.display = '';
+    container.innerHTML = personas
+        .slice()
+        .sort((a, b) => (Number(b.population_share_w) || 0) - (Number(a.population_share_w) || 0))
+        .map((p) => {
+            const share = Number(p.population_share_w) || 0;
+            const color = p.accent_color ? `background:${escapeHtml(p.accent_color)}` : '';
+            return `
+                <a class="share-row" href="personality.html?id=${encodeURIComponent(p.id)}">
+                    <span class="share-name">${escapeHtml(p.name || t('personas.fallbackName'))}</span>
+                    <span class="share-bar"><span class="share-fill" style="width:${Math.round((share / max) * 100)}%;${color}"></span></span>
+                    <span class="share-pct">${escapeHtml(formatPercent(share, 0))}</span>
+                </a>`;
+        }).join('');
+}
+
 // Display metadata for the three bipolar persuasion dimensions.
-const DIMENSION_META = {
-    epistemic_style:    { name: 'Rapport au savoir',        left: 'Données & institutions', right: 'Intuition & alternatives' },
-    moral_foundations:  { name: 'Fondements moraux',        left: 'Soin & justice',         right: 'Loyauté & tradition' },
-    threat_sensitivity: { name: 'Rapport au changement',    left: 'Ouvert au changement',   right: 'Défense du statu quo' },
-};
+const DIMENSION_META = Object.fromEntries(
+    ['epistemic_style', 'moral_foundations', 'threat_sensitivity'].map((k) => [k, {
+        name: t(`dim.${k}.name`), left: t(`dim.${k}.left`), right: t(`dim.${k}.right`),
+    }])
+);
 
 function renderArchetypesGrid(archetypes) {
     const grid = document.getElementById('archetypesGrid');
@@ -2290,13 +2307,13 @@ function createArchetypeCard(p) {
     if (p.accent_color) card.style.setProperty('--accent', p.accent_color);
 
     const emoji = p.icon_emoji ? escapeHtml(p.icon_emoji) : '🧑';
-    const name = escapeHtml(p.name || 'Archetype');
+    const name = escapeHtml(p.name || t('personas.fallbackName'));
     const sublabel = p.short_label ? escapeHtml(p.short_label) : (p.description ? escapeHtml(p.description) : '');
     const values = p.value_system ? escapeHtml(p.value_system) : '';
     const engagement = p.engagement_stance ? escapeHtml(p.engagement_stance) : '';
 
     const persuasion = p.persuasion || {};
-    const format = persuasion.format ? escapeHtml(persuasion.format.replace(/_/g, ' ')) : '';
+    const format = persuasion.format ? escapeHtml(formatLabel(persuasion.format)) : '';
     // Teaser: first sentence of the approach.
     const approach = String(persuasion.approach || '');
     const firstStop = approach.indexOf('. ');
@@ -2311,16 +2328,16 @@ function createArchetypeCard(p) {
             </div>
         </header>
 
-        ${values ? `<p class="archetype-values"><span class="field-label">Value system</span>${values}</p>` : ''}
+        ${values ? `<p class="archetype-values"><span class="field-label">${escapeHtml(t('personas.valueSystem'))}</span>${values}</p>` : ''}
 
         <div class="archetype-tags">
-            ${engagement ? `<span class="engagement-badge">Engagement: ${engagement}</span>` : ''}
+            ${engagement ? `<span class="engagement-badge">${escapeHtml(t('personas.engagement', { value: p.engagement_stance }))}</span>` : ''}
             ${format ? `<span class="format-tag">${format}</span>` : ''}
         </div>
 
-        ${teaser ? `<p class="approach-teaser"><strong>${icon('bulb')} How to reach them:</strong> ${escapeHtml(teaser)}</p>` : ''}
+        ${teaser ? `<p class="approach-teaser"><strong>${icon('bulb')} ${escapeHtml(t('personas.howToReach'))}</strong> ${escapeHtml(teaser)}</p>` : ''}
 
-        <span class="archetype-cta">View full profile →</span>
+        <span class="archetype-cta">${escapeHtml(t('personas.viewProfile'))}</span>
     `;
 
     return card;
@@ -2339,7 +2356,7 @@ async function initPersonalityDetailPage() {
     const id = parseInt(params.get('id'), 10);
     if (!Number.isInteger(id)) {
         if (loading) loading.style.display = 'none';
-        if (errorEl) { errorEl.textContent = 'No personality selected.'; errorEl.style.display = 'block'; }
+        if (errorEl) { errorEl.textContent = t('persona.none'); errorEl.style.display = 'block'; }
         return;
     }
 
@@ -2353,7 +2370,7 @@ async function initPersonalityDetailPage() {
         if (!res.ok) throw new Error('Failed to load personalities');
         const all = await res.json();
         const list = Array.isArray(all) ? all : [];
-        const p = list.find((x) => x && x.id === id);
+        const p = list.find((x) => isActivePersona(x) && x.id === id);
 
         const allArgs = argsRes.ok ? await argsRes.json() : [];
         const personaArgs = (Array.isArray(allArgs) ? allArgs : [])
@@ -2361,11 +2378,11 @@ async function initPersonalityDetailPage() {
 
         if (loading) loading.style.display = 'none';
         if (!p) {
-            if (errorEl) { errorEl.textContent = 'Personality not found.'; errorEl.style.display = 'block'; }
+            if (errorEl) { errorEl.textContent = t('persona.notFound'); errorEl.style.display = 'block'; }
             return;
         }
 
-        document.title = `${p.name || 'Personality'} - re.inform`;
+        document.title = t('site.pageTitle', { page: p.name || t('personas.fallbackName') });
         if (container) {
             container.style.display = 'block';
             renderPersonaProfile(p, container, personaArgs);
@@ -2373,13 +2390,13 @@ async function initPersonalityDetailPage() {
 
         // Prev/next among the named archetypes only.
         const archetypes = list
-            .filter((x) => x && (x.layer === 'archetype' || (x.imported_from && x.imported_from.project === 'BonPoteJS')))
+            .filter((x) => isActivePersona(x) && (x.layer === 'archetype' || (x.imported_from && x.imported_from.project === 'BonPoteJS')))
             .sort((a, b) => (a.id || 0) - (b.id || 0));
         renderPersonaNav(archetypes, id);
     } catch (error) {
         console.error('Error loading personality:', error);
         if (loading) loading.style.display = 'none';
-        if (errorEl) { errorEl.textContent = 'Failed to load this personality. Please try again later.'; errorEl.style.display = 'block'; }
+        if (errorEl) { errorEl.textContent = t('persona.loadError'); errorEl.style.display = 'block'; }
     }
 }
 
@@ -2404,8 +2421,8 @@ function personaClaimsSection(persona, args) {
     if (!top.length) {
         return `
             <section class="persona-section">
-                <h3>What you'll hear</h3>
-                <p class="empty-message">No claims are linked to this personality yet.</p>
+                <h3>${escapeHtml(t('persona.claimsTitle'))}</h3>
+                <p class="empty-message">${escapeHtml(t('persona.claimsEmpty'))}</p>
             </section>`;
     }
 
@@ -2416,16 +2433,17 @@ function personaClaimsSection(persona, args) {
         const badge = (count && typeof avg === 'number')
             ? (() => {
                 const level = importanceLevel(avg);
-                return `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${count} rating${count === 1 ? '' : 's'}">${icon('target')} ${level.label} · ${avg.toFixed(1)}/5</span>`;
+                const avgText = formatNumber(avg, 1);
+                return `<span class="needs-badge feed-importance ${level.className}" title="${escapeHtml(t('importance.title', { avg: avgText, n: count }))}">${icon('target')} ${escapeHtml(level.label)} · ${avgText}/5</span>`;
             })()
-            : `<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">${icon('target')} Importance unrated</span>`;
+            : `<span class="needs-badge feed-importance feed-importance-unrated" title="${escapeHtml(t('importance.unratedTitle'))}">${icon('target')} ${escapeHtml(t('importance.unrated'))}</span>`;
 
         const contributions = a.contribution_count || 0;
         return `
             <a class="needs-card" href="argument.html?id=${encodeURIComponent(a.id)}">
-                <p class="needs-quote">"${formatClaimText(a.text)}"</p>
+                <p class="needs-quote">${quotedClaimHtml(a.text)}</p>
                 <div class="needs-meta">
-                    <span class="needs-badge" title="Debunks, ratings and resources combined">${icon('layers')} ${contributions} contribution${contributions === 1 ? '' : 's'}</span>
+                    <span class="needs-badge" title="${escapeHtml(t('importance.contributionsTitle'))}">${icon('layers')} ${escapeHtml(t('importance.contributions', { n: contributions }))}</span>
                     ${badge}
                 </div>
             </a>`;
@@ -2434,10 +2452,10 @@ function personaClaimsSection(persona, args) {
     return `
         <section class="persona-section">
             <div class="persona-claims-head">
-                <h3>What you'll hear</h3>
-                <a class="persona-claims-more" href="${seeMoreHref}">See all ${args.length} claim${args.length === 1 ? '' : 's'} →</a>
+                <h3>${escapeHtml(t('persona.claimsTitle'))}</h3>
+                <a class="persona-claims-more" href="${seeMoreHref}">${escapeHtml(t('persona.claimsAll', { n: args.length }))}</a>
             </div>
-            <p class="persona-claims-sub">The claims aimed at this personality, most important to debunk first.</p>
+            <p class="persona-claims-sub">${escapeHtml(t('persona.claimsLead'))}</p>
             <div class="persona-claims">${cards}</div>
         </section>`;
 }
@@ -2446,7 +2464,7 @@ function renderPersonaProfile(p, container, personaArgs = []) {
     if (p.accent_color) container.style.setProperty('--accent', p.accent_color);
 
     const emoji = p.icon_emoji ? escapeHtml(p.icon_emoji) : '🧑';
-    const name = escapeHtml(p.name || 'Personality');
+    const name = escapeHtml(p.name || t('personas.fallbackName'));
     const sublabel = p.short_label ? escapeHtml(p.short_label) : (p.description ? escapeHtml(p.description) : '');
     const values = p.value_system ? escapeHtml(p.value_system) : '';
 
@@ -2460,7 +2478,7 @@ function renderPersonaProfile(p, container, personaArgs = []) {
 
     const persuasion = p.persuasion || {};
     const approach = persuasion.approach ? escapeHtml(persuasion.approach) : '';
-    const format = persuasion.format ? escapeHtml(persuasion.format.replace(/_/g, ' ')) : '';
+    const format = persuasion.format ? escapeHtml(formatLabel(persuasion.format)) : '';
     const doList = Array.isArray(persuasion.do) ? persuasion.do : [];
     const dontList = Array.isArray(persuasion.dont) ? persuasion.dont : [];
     const messengers = Array.isArray(persuasion.messengers) ? persuasion.messengers : [];
@@ -2470,7 +2488,7 @@ function renderPersonaProfile(p, container, personaArgs = []) {
 
     // EVS-cluster fields (population grounding layer), shown when present.
     const share = Number(p.population_share_w);
-    const sharePct = Number.isFinite(share) ? `${(share * 100).toFixed(1)}%` : '';
+    const sharePct = Number.isFinite(share) ? formatPercent(share, 0) : '';
     const axesLabels = Array.isArray(p.top_axes_labels) ? p.top_axes_labels.map((x) => escapeHtml(String(x))) : [];
 
     container.innerHTML = `
@@ -2483,37 +2501,37 @@ function renderPersonaProfile(p, container, personaArgs = []) {
                 </div>
             </div>
             ${values ? `<p class="persona-hero-values">${values}</p>` : ''}
-            ${sharePct ? `<p class="persona-hero-share">Estimated ${sharePct} of the French population (EVS 2018).</p>` : ''}
+            ${sharePct ? `<p class="persona-hero-share">${escapeHtml(t('persona.share', { pct: sharePct }))}</p>` : ''}
         </div>
 
         <div class="persona-body">
             ${dimsHtml ? `
             <section class="persona-section">
-                <h3>What defines them</h3>
+                <h3>${escapeHtml(t('persona.defines'))}</h3>
                 <div class="archetype-dims">${dimsHtml}</div>
                 <div class="archetype-tags persona-tags">
-                    ${engagement ? `<span class="engagement-badge">Engagement: ${engagement}</span>` : ''}
-                    ${anchoring ? `<span class="anchoring-note"><strong>Trusted messengers:</strong> ${anchoring}</span>` : ''}
+                    ${engagement ? `<span class="engagement-badge">${escapeHtml(t('personas.engagement', { value: p.engagement_stance }))}</span>` : ''}
+                    ${anchoring ? `<span class="anchoring-note"><strong>${escapeHtml(t('persona.messengers'))}</strong> ${anchoring}</span>` : ''}
                 </div>
             </section>` : ''}
 
             ${approach ? `
             <section class="persona-section persuasion-panel">
-                <h3>${icon('bulb')} How to change their mind${format ? ` <span class="format-tag">${format}</span>` : ''}</h3>
+                <h3>${icon('bulb')} ${escapeHtml(t('persona.howToChange'))}${format ? ` <span class="format-tag">${format}</span>` : ''}</h3>
                 <p class="approach">${approach}</p>
                 ${(doList.length || dontList.length) ? `
                 <div class="do-dont">
-                    ${doList.length ? `<div class="do-col"><span class="do-label">${icon('check')} Do</span><ul>${listHtml(doList)}</ul></div>` : ''}
-                    ${dontList.length ? `<div class="dont-col"><span class="dont-label">${icon('ban')} Avoid</span><ul>${listHtml(dontList)}</ul></div>` : ''}
+                    ${doList.length ? `<div class="do-col"><span class="do-label">${icon('check')} ${escapeHtml(t('persona.do'))}</span><ul>${listHtml(doList)}</ul></div>` : ''}
+                    ${dontList.length ? `<div class="dont-col"><span class="dont-label">${icon('ban')} ${escapeHtml(t('persona.avoid'))}</span><ul>${listHtml(dontList)}</ul></div>` : ''}
                 </div>` : ''}
-                ${messengers.length ? `<div class="messengers-row"><span class="field-label">Who to bring</span>${chipHtml(messengers)}</div>` : ''}
+                ${messengers.length ? `<div class="messengers-row"><span class="field-label">${escapeHtml(t('persona.whoToBring'))}</span>${chipHtml(messengers)}</div>` : ''}
             </section>` : ''}
 
             ${personaClaimsSection(p, personaArgs)}
 
             ${axesLabels.length ? `
             <section class="persona-section">
-                <h3>Most distinguishing value axes</h3>
+                <h3>${escapeHtml(t('persona.axes'))}</h3>
                 <div class="messengers-row">${axesLabels.map((a) => `<span class="mini-chip">${a}</span>`).join('')}</div>
             </section>` : ''}
         </div>
@@ -2531,10 +2549,10 @@ function renderPersonaNav(archetypes, currentId) {
 
     const link = (persona, dir) => {
         if (!persona) return '<span></span>';
-        const label = escapeHtml(persona.name || 'Personality');
+        const label = escapeHtml(persona.name || t('personas.fallbackName'));
         const arrow = dir === 'prev' ? '←' : '→';
         return `<a class="persona-nav-link persona-nav-${dir}" href="personality.html?id=${encodeURIComponent(persona.id)}">
-            <span class="persona-nav-dir">${arrow} ${dir === 'prev' ? 'Previous' : 'Next'}</span>
+            <span class="persona-nav-dir">${arrow} ${escapeHtml(t(dir === 'prev' ? 'persona.previous' : 'persona.next'))}</span>
             <span class="persona-nav-name">${label}</span>
         </a>`;
     };
@@ -2612,15 +2630,15 @@ function createFilterBar(mount, spec) {
             <div class="filterbar-tail">
                 ${sortSpec ? `
                 <label class="filterbar-sort">
-                    <span>${escapeHtml(sortSpec.label || 'Sort')}</span>
+                    <span>${escapeHtml(sortSpec.label || t('filter.sort'))}</span>
                     <select></select>
                 </label>` : ''}
                 ${spec.search ? `
                 <div class="filterbar-search">
                     <span class="search-icon" aria-hidden="true">${SEARCH_ICON_SVG}</span>
                     <input type="search" class="search-bar filterbar-input"
-                           placeholder="${escapeHtml(spec.search.placeholder || 'Search…')}"
-                           aria-label="${escapeHtml(spec.search.placeholder || 'Search')}">
+                           placeholder="${escapeHtml(spec.search.placeholder || t('filter.search'))}"
+                           aria-label="${escapeHtml(spec.search.placeholder || t('filter.search'))}">
                 </div>` : ''}
             </div>
         </div>
@@ -2692,7 +2710,7 @@ function createFilterBar(mount, spec) {
 
     function renderMenu(facet) {
         if (!facet.options.length) {
-            facet._menu.innerHTML = '<p class="filterbar-menu-empty">Nothing to filter by yet.</p>';
+            facet._menu.innerHTML = `<p class="filterbar-menu-empty">${escapeHtml(t('filter.nothing'))}</p>`;
             return;
         }
         facet._menu.innerHTML = '<div class="filterbar-options">' + facet.options.map((o) => {
@@ -2717,12 +2735,12 @@ function createFilterBar(mount, spec) {
         const pills = [];
         facets.forEach((facet) => {
             facet.selected.forEach((v) => {
-                pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-value="${escapeHtml(String(v))}">${escapeHtml(facet.label)}: ${optionLabel(facet, v)} ✕</button>`);
+                pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-value="${escapeHtml(String(v))}">${escapeHtml(t('filter.chipLabel', { label: facet.label }))} ${optionLabel(facet, v)} ✕</button>`);
             });
         });
         if (!pills.length && !searchValue.trim()) { chipsEl.innerHTML = ''; return; }
         chipsEl.innerHTML = pills.join('') +
-            '<button type="button" class="filterbar-chip filterbar-chip-clear" data-clear="all">Clear all</button>';
+            `<button type="button" class="filterbar-chip filterbar-chip-clear" data-clear="all">${escapeHtml(t('filter.clearAll'))}</button>`;
 
         chipsEl.querySelectorAll('[data-value]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -2808,7 +2826,12 @@ let feedSort = 'responses';
 // ("01"…"10") are analysis placeholders and must never be offered in the UI.
 function isNamedPersona(p) {
     const name = String(p?.name || '').trim();
-    return Boolean(name) && !/^\d+$/.test(name);
+    return isActivePersona(p) && Boolean(name) && !/^\d+$/.test(name);
+}
+
+// Personas can be retired (e.g. the old EVS groups 01–10); never show those.
+function isActivePersona(p) {
+    return Boolean(p) && p.status !== 'retired';
 }
 
 let feedQuery = '';
@@ -2819,25 +2842,91 @@ let feedTopics = new Set();
 let feedPersonaIds = new Set();
 let feedPersonaList = [];
 
+const FEED_PAGE_SIZE = 12;
+let feedShown = FEED_PAGE_SIZE;
+// Persona id → accent colour (from the archetype list), for card avatars and chips.
+let feedPersonaColors = new Map();
+// The named archetypes (the five people a claim can be answered for).
+let feedArchetypes = [];
+
+// Two ways to use the home feed: 'find' an answer (the normal feed, filtered by
+// who you're talking to) or 'help' out (compact cards built around one task).
+// Both are kept in the URL: ?mode=help&task=vote|write|rate.
+let feedMode = 'find';
+let helpTask = 'vote';
+
+// Help-out tasks. `test` says whether a claim needs this help; `signal` is the
+// line above the claim; `action` is the card's one button.
+const HELP_TASKS = {
+    vote: {
+        icon: 'target',
+        test: (a) => a.importance?.my_score == null,
+        signal: (a) => (a.importance?.count
+            ? priorityTally(a.importance.count, a.importance.avg_score)
+            : t('help.vote.none')),
+    },
+    write: {
+        icon: 'users',
+        test: (a) => missingArchetypes(a).length > 0,
+        signal: (a) => {
+            const missing = missingArchetypes(a);
+            const names = missing.slice(0, 2).map((p) => firstName(p.name)).join(', ');
+            return t('help.write.signal', { names: missing.length > 2 ? `${names} +${missing.length - 2}` : names });
+        },
+    },
+    rate: {
+        icon: 'star',
+        test: (a) => Boolean(a.top_response?.text) && !a.rated,
+        signal: () => t('help.rate.signal'),
+    },
+};
+
+// People with no tailored answer on this claim. The list is rotated by claim id
+// so suggestions spread across people rather than always naming the same one.
+function missingArchetypes(a) {
+    const covered = new Set((a.personas || []).map((p) => p && p.id));
+    const missing = feedArchetypes.filter((p) => !covered.has(p.id));
+    const k = missing.length ? (Number(a.id) || 0) % missing.length : 0;
+    return missing.slice(k).concat(missing.slice(0, k));
+}
+
+function firstName(name) {
+    return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
 async function initRespondPage() {
     const loadingMessage = document.getElementById('loadingMessage');
     const errorMessage = document.getElementById('errorMessage');
+    const params = new URLSearchParams(window.location.search);
 
     feedPersonaIds = new Set(
-        (new URLSearchParams(window.location.search).get('persona') || '')
+        (params.get('persona') || '')
             .split(',')
             .map((s) => parseInt(s, 10))
             .filter(Number.isInteger)
     );
+    feedQuery = params.get('q') || '';
+    feedTopics = new Set((params.get('topic') || '').split(',').filter(Boolean));
+    feedMode = params.get('mode') === 'help' ? 'help' : 'find';
+    if (HELP_TASKS[params.get('task')]) helpTask = params.get('task');
+
+    setupFeedSearch();
+    setupModeSwitch();
+    syncModeUi();
+    document.getElementById('feedMore')?.addEventListener('click', () => {
+        feedShown += FEED_PAGE_SIZE;
+        renderArgumentsList();
+    });
 
     try {
-        const response = await fetch(`${API_BASE_URL}/arguments`);
+        // Credentials so the API can say which claims this visitor already voted on.
+        const response = await fetch(`${API_BASE_URL}/arguments`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load narratives');
         allArguments = await response.json();
         if (!Array.isArray(allArguments)) allArguments = [];
 
         // Full persona roster: every persona that appears on a claim, deduped,
-        // plus the archetype list as a fallback for names.
+        // plus the archetype list for names and accent colours.
         const byId = new Map();
         allArguments.forEach((a) => (a.personas || []).forEach((x) => {
             if (x && Number.isInteger(x.id) && !byId.has(x.id)) byId.set(x.id, { id: x.id, name: x.name, emoji: x.emoji });
@@ -2846,104 +2935,327 @@ async function initRespondPage() {
             const personaRes = await fetch(`${API_BASE_URL}/persona-archetypes`);
             const personas = personaRes.ok ? await personaRes.json() : [];
             (Array.isArray(personas) ? personas : []).forEach((p) => {
-                if (p && Number.isInteger(p.id) && !byId.has(p.id)) {
-                    byId.set(p.id, { id: p.id, name: p.name, emoji: p.icon_emoji });
-                }
+                if (!isActivePersona(p) || !Number.isInteger(p.id)) return;
+                if (p.accent_color) feedPersonaColors.set(p.id, p.accent_color);
+                if (p.layer === 'archetype' && isNamedPersona(p)) feedArchetypes.push({ id: p.id, name: p.name });
+                if (!byId.has(p.id)) byId.set(p.id, { id: p.id, name: p.name, emoji: p.icon_emoji });
             });
         } catch (_) { /* roster still works from claims alone */ }
         feedPersonaList = Array.from(byId.values())
-            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), LANG));
 
         // Drop any seeded id that matches no known persona.
         feedPersonaIds = new Set([...feedPersonaIds].filter((id) => byId.has(id)));
 
         if (loadingMessage) loadingMessage.style.display = 'none';
 
-        const topicOptions = [...new Set(allArguments.flatMap((a) => a.tags || []).filter(Boolean))]
-            .sort().map((t) => ({ value: t, label: capitalizeWords(t) }));
-
-        // Only offer personas that actually appear on a claim — filtering by one
-        // with no claims would only ever empty the feed.
+        // Offer every named persona (the archetypes), even before they have an
+        // answer, plus any other named persona that appears on a claim.
         const personasWithClaims = new Set(allArguments.flatMap((a) => (a.personas || []).map((x) => x && x.id)));
-        const personaOptions = feedPersonaList
-            .filter((p) => personasWithClaims.has(p.id) && isNamedPersona(p))
-            .map((p) => ({ value: String(p.id), label: p.name || 'Unknown', emoji: p.emoji }));
+        const archetypeIds = new Set(feedArchetypes.map((p) => p.id));
+        renderPersonaChips(feedPersonaList.filter((p) => isNamedPersona(p)
+            && (archetypeIds.has(p.id) || personasWithClaims.has(p.id))));
 
-        createFilterBar(document.getElementById('feedControls'), {
-            facets: [
-                { id: 'persona', label: 'Personality', icon: icon('users'), options: personaOptions, selected: [...feedPersonaIds].map(String) },
-                { id: 'topic', label: 'Topic', icon: icon('tag'), options: topicOptions },
-            ],
-            sort: {
-                label: 'Sort', value: feedSort, options: [
-                    { value: 'responses', label: 'Most active' },
-                    { value: 'gaps', label: 'Needs help' },
-                    { value: 'title', label: 'A–Z' },
-                ],
-            },
-            search: { placeholder: 'Search a claim you heard…' },
-            onChange: (s) => {
-                feedPersonaIds = new Set(s.facets.persona.map(Number));
-                feedTopics = new Set(s.facets.topic);
-                feedSort = s.sort;
-                feedQuery = s.q;
-                syncPersonaUrl();
-                renderArgumentsList();
-            },
-        });
+        // Topics, most used first.
+        const topicCounts = new Map();
+        allArguments.forEach((a) => (a.tags || []).forEach((t) => t && topicCounts.set(t, (topicCounts.get(t) || 0) + 1)));
+        renderTopicChips([...topicCounts.entries()].sort((x, y) => y[1] - x[1]).map(([t]) => t));
 
         renderArgumentsList();
     } catch (error) {
         console.error('Error loading narratives:', error);
         if (loadingMessage) loadingMessage.style.display = 'none';
         if (errorMessage) {
-            errorMessage.textContent = 'Failed to load the feed. Please try again later.';
+            errorMessage.textContent = t('feed.loadError');
             errorMessage.style.display = 'block';
         }
     }
 }
 
-function renderArgumentsList() {
-    const list = document.getElementById('argumentsList');
-    const emptyMessage = document.getElementById('emptyMessage');
-    if (!list) return;
+// The header search filters the feed live on the home page (elsewhere it
+// submits to index.html?q=…).
+function setupFeedSearch() {
+    const input = document.getElementById('siteSearch');
+    if (!input) return;
+    input.value = feedQuery;
+    input.form?.addEventListener('submit', (e) => e.preventDefault());
+    let debounce;
+    input.addEventListener('input', () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+            feedQuery = input.value;
+            refreshFeed();
+        }, 150);
+    });
+}
 
-    const query = feedQuery.trim().toLowerCase();
+// Filter pills: clicking a pill adds it to the selection, clicking it again
+// removes it; the first pill ("Everyone" / "All topics") clears its row.
+// Several people (or topics) combine with OR; people and topics with AND.
+let feedPersonaChoices = [];
+let feedTopicChoices = [];
 
-    let items = allArguments.filter((a) => {
-        const text = String(a.text || '').toLowerCase();
-        const matchesQuery = !query || text.includes(query);
-        const matchesTopic = feedTopics.size === 0 || (a.tags || []).some((t) => feedTopics.has(t));
-        const matchesPersona = feedPersonaIds.size === 0
+function renderPersonaChips(personas) {
+    feedPersonaChoices = personas;
+    renderFeedFilters();
+}
+
+function renderTopicChips(topics) {
+    feedTopicChoices = topics;
+    renderFeedFilters();
+}
+
+function setupModeSwitch() {
+    const sw = document.getElementById('modeSwitch');
+    if (!sw) return;
+    sw.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-mode]');
+        if (!btn || btn.dataset.mode === feedMode) return;
+        feedMode = btn.dataset.mode;
+        syncModeUi();
+        refreshFeed();
+    });
+}
+
+// Show the controls of the current mode and mark the active switch button.
+function syncModeUi() {
+    const help = feedMode === 'help';
+    document.querySelectorAll('#modeSwitch [data-mode]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.mode === feedMode));
+    });
+    const find = document.getElementById('findControls');
+    const helpEl = document.getElementById('helpControls');
+    const more = document.getElementById('helpMore');
+    if (find) find.hidden = help;
+    if (helpEl) helpEl.hidden = !help;
+    if (more) more.hidden = !help;
+    document.getElementById('argumentsList')?.classList.toggle('is-help', help);
+    // The header's « Participer » opens this page in help mode: mark the right item.
+    const nav = document.getElementById('siteLinks');
+    nav?.querySelector('a[data-i18n="nav.debunk"]')?.toggleAttribute('aria-current', !help);
+    nav?.querySelector('a[data-i18n="nav.contribute"]')?.toggleAttribute('aria-current', help);
+    nav?.querySelectorAll('[aria-current]').forEach((el) => el.setAttribute('aria-current', 'page'));
+}
+
+// Help-out task picker: one button per task, with how many claims need it.
+function renderHelpTasks() {
+    const el = document.getElementById('helpTasks');
+    if (!el || feedMode !== 'help') return;
+    const pool = filteredFeedItems({ ignorePersonas: true });
+    el.innerHTML = Object.entries(HELP_TASKS).map(([id, task]) => `
+        <button type="button" class="help-task" data-task="${id}" aria-pressed="${helpTask === id}">
+            <span class="help-task-title">${icon(task.icon)} ${escapeHtml(t(`help.${id}.title`))}</span>
+            <span class="help-task-sub">${escapeHtml(t(`help.${id}.sub`))}</span>
+            <span class="help-task-n">${escapeHtml(t('help.count', { n: pool.filter(task.test).length }))}</span>
+        </button>`).join('');
+    el.onclick = (e) => {
+        const btn = e.target.closest('[data-task]');
+        if (!btn || btn.dataset.task === helpTask) return;
+        helpTask = btn.dataset.task;
+        refreshFeed();
+    };
+}
+
+function renderFeedFilters() {
+    renderHelpTasks();
+    const people = document.getElementById('personaChips');
+    const topics = document.getElementById('topicChips');
+    const anyActive = feedPersonaIds.size || feedTopics.size || feedQuery.trim();
+
+    if (people) {
+        people.innerHTML = `<button type="button" class="chip" data-all aria-pressed="${!feedPersonaIds.size}">${escapeHtml(t('feed.everyone'))}</button>` +
+            feedPersonaChoices.map((p) =>
+                `<button type="button" class="chip" data-value="${p.id}" aria-pressed="${feedPersonaIds.has(p.id)}">` +
+                `<span class="chip-dot" style="background:${escapeHtml(personaColor(p.id))}"></span>${escapeHtml(p.name || t('common.unknown'))}</button>`
+            ).join('');
+        people.onclick = (e) => onFilterPick(e, feedPersonaIds, Number);
+        watchRowOverflow(people);
+    }
+    if (topics) {
+        topics.innerHTML = `<button type="button" class="topic" data-all aria-pressed="${!feedTopics.size}">${escapeHtml(t('feed.allTopics'))}</button>` +
+            feedTopicChoices.map((t) =>
+                `<button type="button" class="topic" data-value="${escapeHtml(t)}" aria-pressed="${feedTopics.has(t)}">${escapeHtml(topicLabel(t))}</button>`
+            ).join('') +
+            (anyActive ? `<button type="button" class="filter-clear" data-clear-all>${escapeHtml(t('feed.clearAll'))}</button>` : '');
+        topics.onclick = (e) => {
+            if (e.target.closest('[data-clear-all]')) {
+                feedPersonaIds.clear();
+                feedTopics.clear();
+                feedQuery = '';
+                const search = document.getElementById('siteSearch');
+                if (search) search.value = '';
+                return refreshFeed();
+            }
+            onFilterPick(e, feedTopics, String);
+        };
+    }
+}
+
+// A horizontally scrolling row fades at the edge that has more to show, so the
+// last chips don't look like the end of the list on narrow screens.
+function watchRowOverflow(row) {
+    const update = () => {
+        const max = row.scrollWidth - row.clientWidth;
+        row.classList.toggle('has-more-right', row.scrollLeft < max - 2);
+        row.classList.toggle('has-more-left', row.scrollLeft > 2);
+    };
+    if (!row.dataset.overflowWatched) {
+        row.dataset.overflowWatched = '1';
+        row.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+    }
+    update();
+}
+
+function onFilterPick(e, selection, cast) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.hasAttribute('data-all')) {
+        selection.clear();
+    } else if (btn.dataset.value !== undefined) {
+        const v = cast(btn.dataset.value);
+        if (selection.has(v)) selection.delete(v); else selection.add(v);
+    } else {
+        return;
+    }
+    refreshFeed();
+}
+
+function refreshFeed() {
+    feedShown = FEED_PAGE_SIZE;
+    syncFeedUrl();
+    renderFeedFilters();
+    renderArgumentsList();
+}
+
+// Topic tags and persuasion formats are stable codes in the data; show them in
+// the interface language, falling back to the code itself.
+function topicLabel(tag) {
+    const code = String(tag || '').trim();
+    return tOr(`topic.${code.toLowerCase()}`, capFirst(code));
+}
+
+function formatLabel(code) {
+    const c = String(code || '').trim();
+    return tOr(`format.${c.toLowerCase().replace(/\s+/g, '_')}`, c.replace(/_/g, ' '));
+}
+
+function capFirst(text) {
+    const t = String(text || '');
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function personaColor(id) {
+    return feedPersonaColors.get(id) || '#6b746e';
+}
+
+// Claims matching the search and topic filters (and, in Find mode, the people picked).
+function filteredFeedItems({ ignorePersonas = false } = {}) {
+    const query = normalizeSearch(feedQuery);
+    return allArguments.filter((a) => {
+        const matchesQuery = !query || normalizeSearch(`${a.text || ''} ${a.top_response?.text || ''}`).includes(query);
+        const matchesTopic = feedTopics.size === 0 || (a.tags || []).some((tag) => feedTopics.has(tag));
+        const matchesPersona = ignorePersonas || feedPersonaIds.size === 0
             || (a.personas || []).some((x) => x && feedPersonaIds.has(x.id));
         return matchesQuery && matchesTopic && matchesPersona;
     });
+}
 
-    items = items.slice().sort((a, b) => {
-        const ca = a.contribution_count || 0;
-        const cb = b.contribution_count || 0;
-        if (feedSort === 'gaps') return ca - cb;
-        if (feedSort === 'title') return String(a.text || '').localeCompare(String(b.text || ''));
-        return cb - ca; // most active (default)
-    });
+function renderArgumentsList() {
+    const list = document.getElementById('argumentsList');
+    const emptyMessage = document.getElementById('emptyMessage');
+    const moreBtn = document.getElementById('feedMore');
+    if (!list) return;
+
+    const help = feedMode === 'help';
+    let items = filteredFeedItems({ ignorePersonas: help });
+
+    if (help) {
+        // Most urgent first (community importance), then the least worked-on.
+        items = items.filter(HELP_TASKS[helpTask].test).sort((a, b) =>
+            ((b.importance?.avg_score || 0) - (a.importance?.avg_score || 0))
+            || ((a.contribution_count || 0) - (b.contribution_count || 0)));
+    } else {
+        items = items.slice().sort((a, b) => {
+            const ca = a.contribution_count || 0;
+            const cb = b.contribution_count || 0;
+            if (feedSort === 'gaps') return ca - cb;
+            if (feedSort === 'title') return String(a.text || '').localeCompare(String(b.text || ''), LANG);
+            return cb - ca; // most active (default)
+        });
+    }
 
     list.innerHTML = '';
+    if (moreBtn) moreBtn.hidden = items.length <= feedShown;
 
     if (!items.length) {
-        if (emptyMessage) emptyMessage.style.display = 'block';
+        if (help) {
+            list.innerHTML = `<p class="feed-empty">${escapeHtml(t('help.empty'))}</p>`;
+            if (emptyMessage) emptyMessage.style.display = 'none';
+        } else if (emptyMessage) {
+            emptyMessage.style.display = 'block';
+        }
         return;
     }
     if (emptyMessage) emptyMessage.style.display = 'none';
 
-    items.forEach((a) => list.appendChild(createFeedCard(a)));
+    items.slice(0, feedShown).forEach((a) => list.appendChild(help ? createHelpCard(a, helpTask) : createFeedCard(a)));
+}
+
+// Help-out card: why this claim needs help, the claim, and one action.
+function createHelpCard(a, taskId) {
+    const task = HELP_TASKS[taskId];
+    const href = `argument.html?id=${encodeURIComponent(a.id)}`;
+    let action = '';
+    let extra = '';
+
+    if (taskId === 'vote') {
+        const mine = a.importance?.my_score ?? null;
+        action = `
+            <div class="help-vote" role="group" aria-label="${escapeHtml(t('priority.groupLabel'))}">
+                ${PRIORITY_LEVELS.map((lvl) => `
+                    <button type="button" class="priority-btn${mine === lvl.score ? ' is-selected' : ''}"
+                            data-score="${lvl.score}" title="${escapeHtml(lvl.hint)}"
+                            aria-pressed="${mine === lvl.score}">${escapeHtml(lvl.label)}</button>`).join('')}
+            </div>`;
+    } else if (taskId === 'write') {
+        const p = missingArchetypes(a)[0];
+        action = `<a class="btn btn-primary btn-small help-cta" href="${href}&amp;write=${encodeURIComponent(p.id)}">${icon('pen')} ${escapeHtml(t('help.write.cta', { name: firstName(p.name) }))}</a>`;
+    } else if (taskId === 'rate') {
+        extra = `<div class="claim-reply"><p>${escapeHtml(a.top_response.text)}</p></div>`;
+        action = `<a class="btn btn-primary btn-small help-cta" href="${href}&amp;rate=1">★ ${escapeHtml(t('help.rate.cta'))}</a>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'claim-card help-card';
+    card.dataset.argumentId = a.id;
+    card.innerHTML = `
+        <p class="help-signal"><span class="priority-tally">${escapeHtml(task.signal(a))}</span></p>
+        <a class="claim-text help-claim" href="${href}">${quotedClaimHtml(a.text)}</a>
+        ${extra}
+        <div class="help-action">${action}</div>
+    `;
+
+    card.querySelectorAll('.priority-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const score = Number(btn.dataset.score);
+            await submitImportanceRating(card, score, { toast: true });
+            // Keep our copy in step so the task counts stay right.
+            if (btn.getAttribute('aria-pressed') === 'true') {
+                a.importance = { ...(a.importance || {}), my_score: score };
+                renderHelpTasks();
+            }
+        });
+    });
+    return card;
 }
 
 // Importance levels mirror the Low/Medium/Critical chips on the contribute page,
 // mapped back from the 1..5 average the ratings are stored on.
 function importanceLevel(avgScore) {
-    if (avgScore >= 4) return { label: 'Critical', className: 'feed-importance-critical' };
-    if (avgScore >= 2.5) return { label: 'Medium', className: 'feed-importance-medium' };
-    return { label: 'Low', className: 'feed-importance-low' };
+    if (avgScore >= 4) return { label: t('priority.critical'), className: 'feed-importance-critical' };
+    if (avgScore >= 2.5) return { label: t('priority.medium'), className: 'feed-importance-medium' };
+    return { label: t('priority.low'), className: 'feed-importance-low' };
 }
 
 // Persona emoji, drawn as black line art by the Noto Emoji font (see .persona-emoji in styles.css).
@@ -2951,65 +3263,44 @@ function personaEmojiHtml(emoji) {
     return emoji ? `<span class="persona-emoji" aria-hidden="true">${escapeHtml(emoji)}</span> ` : '';
 }
 
-// Keep ?persona=… in sync with the current selection so the feed is shareable
-// and survives a refresh.
-function syncPersonaUrl() {
+// Keep the feed's filters in the URL so a filtered view is shareable and
+// survives a refresh.
+function syncFeedUrl() {
     const url = new URL(window.location.href);
-    if (feedPersonaIds.size) {
-        url.searchParams.set('persona', [...feedPersonaIds].join(','));
-    } else {
-        url.searchParams.delete('persona');
-    }
+    const set = (key, value) => (value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+    set('persona', [...feedPersonaIds].join(','));
+    set('topic', [...feedTopics].join(','));
+    set('q', feedQuery.trim());
+    set('mode', feedMode === 'help' ? 'help' : '');
+    set('task', feedMode === 'help' ? helpTask : '');
     window.history.replaceState({}, '', url);
 }
 
 function createFeedCard(a) {
-    // Uses the compact "Needs your help" card template, plus persona emojis.
-    const id = encodeURIComponent(a.id);
-    const href = `argument.html?id=${id}`;
     const count = a.counter_argument_count || 0;
-    const contributions = a.contribution_count || 0;
     const personas = Array.isArray(a.personas) ? a.personas : [];
+    const reply = a.top_response && a.top_response.text ? a.top_response : null;
+    const lead = personas[0] || reply?.persona || null;
 
-    // Affected personalities: emoji + family name (spans — the whole card is a link).
-    const personaChips = personas.slice(0, 3).map((p) => {
-        const parts = (p.name || '').trim().split(/\s+/);
-        const family = escapeHtml(parts.length > 1 ? parts.slice(1).join(' ') : (parts[0] || 'Profile'));
-        const em = personaEmojiHtml(p.emoji);
-        return `<span class="feed-persona-mini" title="${escapeHtml(p.name || '')}">${em}${family}</span>`;
-    }).join('');
-    const moreChip = personas.length > 3 ? `<span class="feed-persona-more">+${personas.length - 3}</span>` : '';
-    const personasHtml = personaChips
-        ? `<div class="needs-personas">${personaChips}${moreChip}</div>`
-        : '';
+    const replyHtml = reply
+        ? `<div class="claim-reply"><span class="claim-reply-label">${escapeHtml(t('card.howToAnswer'))}</span><p>${escapeHtml(reply.text)}</p></div>`
+        : `<div class="claim-reply claim-reply-empty"><span class="claim-reply-label">${escapeHtml(t('card.noAnswer'))}</span><p>${escapeHtml(t('card.beFirst'))}</p></div>`;
 
-    const badge = count === 0
-        ? `<span class="needs-badge needs-badge-hot">${icon('zap')} No response yet</span>`
-        : `<span class="needs-badge" title="Debunks, ratings and resources combined">${icon('layers')} ${contributions} contribution${contributions === 1 ? '' : 's'}</span>`;
-
-    // How urgent the community says this is to debunk — from the importance
-    // ratings cast on the contribute page.
-    const importance = a.importance || {};
-    const ratingCount = importance.count || 0;
-    const avg = importance.avg_score;
-    let importanceHtml;
-    if (ratingCount && typeof avg === 'number') {
-        const level = importanceLevel(avg);
-        importanceHtml = `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${ratingCount} rating${ratingCount === 1 ? '' : 's'}">${icon('target')} ${level.label} · ${avg.toFixed(1)}/5</span>`;
-    } else {
-        importanceHtml = `<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">${icon('target')} Importance unrated</span>`;
-    }
+    // Same look as the "Who are you talking to?" filter pills: dot + full name.
+    const shown = personas.length ? personas : (lead ? [lead] : []);
+    const pill = (p) => `<span class="claim-persona"><span class="chip-dot" style="background:${escapeHtml(personaColor(p.id))}"></span>${escapeHtml(p.name || t('common.unknown'))}</span>`;
+    const who = shown.slice(0, 2).map(pill).join('') +
+        (shown.length > 2 ? `<span class="claim-persona" title="${escapeHtml(shown.slice(2).map((p) => p.name).join(', '))}">+${shown.length - 2}</span>` : '');
+    const answers = `<span>${escapeHtml(t('card.answers', { n: count }))}</span>`;
+    const tag = (a.tags || [])[0] ? `<span class="claim-tag">${escapeHtml(topicLabel(a.tags[0]))}</span>` : '';
 
     const card = document.createElement('a');
-    card.className = 'needs-card';
-    card.href = href;
+    card.className = 'claim-card';
+    card.href = `argument.html?id=${encodeURIComponent(a.id)}`;
     card.innerHTML = `
-        <p class="needs-quote">"${formatClaimText(a.text)}"</p>
-        <div class="needs-meta">
-            ${badge}
-            ${importanceHtml}
-        </div>
-        ${personasHtml}
+        <p class="claim-text">“${formatClaimText(String(a.text || '').trim().replace(/^[«"“”'\s]+|[»"“”'\s]+$/g, ''))}”</p>
+        ${replyHtml}
+        <div class="claim-foot">${who}${answers}${tag}</div>
     `;
     return card;
 }
@@ -3036,7 +3327,7 @@ async function initArgumentDetailPage() {
     if (!Number.isInteger(id)) {
         if (loading) loading.style.display = 'none';
         if (errorEl) {
-            errorEl.textContent = 'No claim selected.';
+            errorEl.textContent = t('claim.none');
             errorEl.style.display = 'block';
         }
         return;
@@ -3069,6 +3360,13 @@ async function initArgumentDetailPage() {
         const write = params.get('write');
         if (write) openComposer(id, /^\d+$/.test(write) ? Number(write) : '');
 
+        // Deep link from the home feed's "Rate an answer": ?rate=1 opens the first response's stars.
+        if (params.get('rate')) {
+            const firstCard = document.querySelector('.response-card');
+            firstCard?.querySelector('.response-rate')?.click();
+            firstCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         // Deep link from the Sourcer queue: ?check=<debunkId> opens its check row.
         const checkId = params.get('check');
         const checkCa = argDetailState.counterArguments.find((c) => String(c.id) === checkId);
@@ -3081,7 +3379,7 @@ async function initArgumentDetailPage() {
         console.error('Error loading narrative:', error);
         if (loading) loading.style.display = 'none';
         if (errorEl) {
-            errorEl.textContent = 'Failed to load this claim. Please try again later.';
+            errorEl.textContent = t('claim.loadError');
             errorEl.style.display = 'block';
         }
     }
@@ -3091,11 +3389,11 @@ function renderArgumentDetail() {
     const arg = argDetailState.argument || {};
     const cas = argDetailState.counterArguments;
 
-    document.getElementById('narrativeText').textContent = arg.text || 'Claim';
-    document.title = `${(arg.text || 'Claim').slice(0, 50)} - re.inform`;
+    document.getElementById('narrativeText').textContent = arg.text || t('claim.fallback');
+    document.title = t('site.pageTitle', { page: (arg.text || t('claim.fallback')).slice(0, 50) });
 
     const tagsEl = document.getElementById('narrativeTags');
-    tagsEl.innerHTML = (arg.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+    tagsEl.innerHTML = (arg.tags || []).map((tag) => `<span class="tag">${escapeHtml(topicLabel(tag))}</span>`).join('');
 
     // "Seen with" chips: personas that already have a tailored response here.
     const seenPersonas = new Map();
@@ -3105,9 +3403,9 @@ function renderArgumentDetail() {
     });
     const seenWith = document.getElementById('seenWith');
     if (seenPersonas.size) {
-        seenWith.innerHTML = `<span class="seen-with-label">Responses for:</span> ` +
+        seenWith.innerHTML = `<span class="seen-with-label">${escapeHtml(t('claim.seenWith'))}</span> ` +
             Array.from(seenPersonas.values())
-                .map((p) => `<span class="persona-chip">${escapeHtml(p.name || 'Profile')}</span>`)
+                .map((p) => `<span class="persona-chip">${escapeHtml(p.name || t('personas.fallbackName'))}</span>`)
                 .join('');
     } else {
         seenWith.innerHTML = '';
@@ -3115,9 +3413,9 @@ function renderArgumentDetail() {
 
     // Persona filter (only personas present in responses) + composer persona select (all named).
     const filterEl = document.getElementById('responsePersonaFilter');
-    filterEl.innerHTML = '<option value="">Anyone</option>' +
+    filterEl.innerHTML = `<option value="">${escapeHtml(t('claim.anyone'))}</option>` +
         Array.from(seenPersonas.values())
-            .map((p) => `<option value="${p.id}">${escapeHtml(p.name || 'Profile')}</option>`)
+            .map((p) => `<option value="${p.id}">${escapeHtml(p.name || t('personas.fallbackName'))}</option>`)
             .join('');
     filterEl.onchange = renderResponses;
 
@@ -3138,13 +3436,13 @@ function renderResponses() {
 
     if (heading) {
         const n = cas.length;
-        heading.textContent = `${n} response${n === 1 ? '' : 's'}`;
+        heading.textContent = t('claim.responsesCount', { n });
     }
 
     list.innerHTML = '';
     if (!cas.length) {
-        list.innerHTML = `<div class="empty-message"><p>No response for this profile yet.</p>
-            <button type="button" class="btn btn-primary" onclick="openComposer(${argDetailState.argumentId}, '${filterId}')">Write the first one</button></div>`;
+        list.innerHTML = `<div class="empty-message"><p>${escapeHtml(t('claim.emptyForProfile'))}</p>
+            <button type="button" class="btn btn-primary" onclick="openComposer(${argDetailState.argumentId}, '${filterId}')">${escapeHtml(t('claim.writeFirst'))}</button></div>`;
         return;
     }
 
@@ -3154,7 +3452,7 @@ function renderResponses() {
 function createResponseCard(ca) {
     const persona = ca.persona_archetype;
     const personaId = persona && persona.id != null ? persona.id : '';
-    const personaName = persona ? (persona.name || 'Profile') : 'General';
+    const personaName = persona ? (persona.name || t('personas.fallbackName')) : t('response.general');
     const framing = persona && persona.description ? ` · ${persona.description}` : '';
 
     const text = String(ca.text || '');
@@ -3164,21 +3462,22 @@ function createResponseCard(ca) {
     const avg = (typeof ca.avg_score === 'number') ? ca.avg_score : null;
     const ratingCount = ca.rating_count || 0;
     const ratingHtml = avg != null
-        ? `<span class="trust-item" title="${avg.toFixed(1)} / 5 from ${ratingCount} rating${ratingCount === 1 ? '' : 's'}">${renderStars(avg)} <span class="rating-count">(${ratingCount})</span></span>`
-        : `<span class="trust-item trust-muted">Not rated yet</span>`;
+        ? `<span class="trust-item" title="${escapeHtml(t('response.ratingTitle', { avg: formatNumber(avg, 1), n: ratingCount }))}">${renderStars(avg)} <span class="rating-count">(${ratingCount})</span></span>`
+        : `<span class="trust-item trust-muted">${escapeHtml(t('response.notRated'))}</span>`;
 
     const resources = Array.isArray(ca.resources) && ca.resources.length
         ? ca.resources
         : (ca.source_url ? [{ url: ca.source_url, title: null }] : []);
     const sourceHtml = resources.length
-        ? resources.map((r) =>
-            `<a class="trust-item source-chip" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${icon('clip')} ${escapeHtml(r.title || hostnameOf(r.url))}</a>`
+        ? resources.map((r) => (safeHref(r.url)
+            ? `<a class="trust-item source-chip" href="${escapeHtml(safeHref(r.url))}" target="_blank" rel="noopener noreferrer">${icon('clip')} ${escapeHtml(r.title || hostnameOf(r.url))}</a>`
+            : `<span class="trust-item source-chip">${icon('clip')} ${escapeHtml(r.title || t('common.source'))}</span>`)
           ).join('')
-        : `<span class="trust-item trust-muted">No source</span>`;
+        : `<span class="trust-item trust-muted">${escapeHtml(t('response.noSource'))}</span>`;
 
     const check = ca.source_check || {};
     const checkBtnHtml = check.can_check
-        ? `<button type="button" class="btn btn-secondary btn-small response-check">${icon('search')} ${check.my_verdict ? 'Change your check' : 'Check source'}</button>`
+        ? `<button type="button" class="btn btn-secondary btn-small response-check">${icon('search')} ${escapeHtml(t(check.my_verdict ? 'response.changeCheck' : 'response.check'))}</button>`
         : '';
 
     const card = document.createElement('div');
@@ -3192,12 +3491,12 @@ function createResponseCard(ca) {
             <span class="response-framing">${escapeHtml(framing)}</span>
         </div>
         <p class="response-text">${escapeHtml(shownText)}</p>
-        ${isLong ? `<button type="button" class="link-btn response-more">Read more</button>` : ''}
+        ${isLong ? `<button type="button" class="link-btn response-more">${escapeHtml(t('response.readMore'))}</button>` : ''}
         <div class="response-trust">${sourceHtml}${sourceStampHtml(check)}${ratingHtml}</div>
         <div class="response-actions">
-            <button type="button" class="btn btn-secondary btn-small response-copy">${icon('copy')} Copy</button>
-            <button type="button" class="btn btn-secondary btn-small response-rate">★ Rate</button>
-            <button type="button" class="btn btn-secondary btn-small response-improve">${icon('pen')} Improve</button>
+            <button type="button" class="btn btn-secondary btn-small response-copy">${icon('copy')} ${escapeHtml(t('response.copy'))}</button>
+            <button type="button" class="btn btn-secondary btn-small response-rate">★ ${escapeHtml(t('response.rate'))}</button>
+            <button type="button" class="btn btn-secondary btn-small response-improve">${icon('pen')} ${escapeHtml(t('response.improve'))}</button>
             ${checkBtnHtml}
         </div>
         <div class="rate-row" style="display: none;" aria-hidden="true"></div>
@@ -3215,18 +3514,18 @@ function createResponseCard(ca) {
         moreBtn.addEventListener('click', () => {
             expanded = !expanded;
             textEl.textContent = expanded ? text : shownText;
-            moreBtn.textContent = expanded ? 'Read less' : 'Read more';
+            moreBtn.textContent = t(expanded ? 'response.readLess' : 'response.readMore');
         });
     }
 
     // Copy → clipboard + conversion nudge toward a field report.
     card.querySelector('.response-copy').addEventListener('click', () => {
-        const urls = resources.map((r) => r.url).filter(Boolean);
-        const toCopy = urls.length ? `${text}\n\nSources:\n${urls.join('\n')}` : text;
+        const urls = resources.map((r) => safeHref(r.url)).filter(Boolean);
+        const toCopy = urls.length ? `${text}\n\n${t('response.copySources')}\n${urls.join('\n')}` : text;
         navigator.clipboard.writeText(toCopy).then(() => {
-            showToast('Copied! Tell us if it worked in a real conversation.');
+            showToast(t('response.copied'));
         }).catch(() => {
-            showToast('Could not copy automatically — select and copy the text.');
+            showToast(t('response.copyFailed'));
         });
     });
 
@@ -3253,26 +3552,23 @@ function createResponseCard(ca) {
 // ---- Source-verified stamp (see backend/roles.py) ----
 
 const SOURCE_STAMPS = {
-    verified: { icon: 'check', label: 'Source verified', cls: 'stamp-verified',
-        title: 'Sourcers checked that the cited sources support this response.' },
-    needs_work: { icon: 'x', label: 'Source needs work', cls: 'stamp-needs-work',
-        title: 'Sourcers found the cited sources don’t fully support this response.' },
-    pending: { icon: 'hourglass', label: 'Source not verified yet', cls: 'stamp-pending',
-        title: 'No Sourcer has confirmed these sources yet.' },
+    verified: { icon: 'check', label: t('stamp.verified'), cls: 'stamp-verified', title: t('stamp.verifiedTitle') },
+    needs_work: { icon: 'x', label: t('stamp.needsWork'), cls: 'stamp-needs-work', title: t('stamp.needsWorkTitle') },
+    pending: { icon: 'hourglass', label: t('stamp.pending'), cls: 'stamp-pending', title: t('stamp.pendingTitle') },
 };
 
 const SOURCE_VERDICTS = [
-    { value: 'supports', label: 'Yes, they back it up' },
-    { value: 'partial', label: 'Only partly' },
-    { value: 'does_not_support', label: 'No' },
-    { value: 'broken', label: 'Link broken' },
+    { value: 'supports', label: t('verdict.supports') },
+    { value: 'partial', label: t('verdict.partial') },
+    { value: 'does_not_support', label: t('verdict.doesNotSupport') },
+    { value: 'broken', label: t('verdict.broken') },
 ];
 
 function sourceStampHtml(check) {
     const stamp = SOURCE_STAMPS[check.status];
     if (!stamp) return '';
     const label = check.status === 'pending' && check.count
-        ? `Source check in progress (${check.count})`
+        ? t('stamp.inProgress', { n: check.count })
         : stamp.label;
     return `<span class="trust-item source-stamp ${stamp.cls}" title="${escapeHtml(stamp.title)}">${icon(stamp.icon)} ${escapeHtml(label)}</span>`;
 }
@@ -3286,17 +3582,17 @@ function toggleCheckRow(card, ca) {
 
     const mine = ca.source_check?.my_verdict || null;
     row.innerHTML = `
-        <span class="rate-label">Open the sources above. Do they back up this response?</span>
-        <div class="check-verdicts" role="group" aria-label="Your verdict">
+        <span class="rate-label">${escapeHtml(t('check.prompt'))}</span>
+        <div class="check-verdicts" role="group" aria-label="${escapeHtml(t('check.verdictLabel'))}">
             ${SOURCE_VERDICTS.map((v) => `
                 <button type="button" class="btn btn-secondary btn-small check-verdict" data-verdict="${v.value}"
                         aria-pressed="${v.value === mine}">${escapeHtml(v.label)}</button>`).join('')}
         </div>
-        <input type="text" class="check-note" maxlength="500" aria-label="Note for the author (optional)"
-               placeholder="Optional: what’s missing or wrong?">
+        <input type="text" class="check-note" maxlength="500" aria-label="${escapeHtml(t('check.noteLabel'))}"
+               placeholder="${escapeHtml(t('check.notePlaceholder'))}">
         <div class="check-submit-row">
-            <button type="button" class="btn btn-primary btn-small check-submit" ${mine ? '' : 'disabled'}>Submit check</button>
-            <span class="check-hint">Your check counts toward the stamp. Points come once the verdict is settled.</span>
+            <button type="button" class="btn btn-primary btn-small check-submit" ${mine ? '' : 'disabled'}>${escapeHtml(t('check.submit'))}</button>
+            <span class="check-hint">${escapeHtml(t('check.hint'))}</span>
         </div>
     `;
 
@@ -3326,26 +3622,26 @@ async function submitSourceCheck(counterArgumentId, verdict, note, row) {
         });
         const data = await res.json();
         if (!res.ok) {
-            showToast(data.error || 'Could not save your check.');
+            apiErrorToast(data, 'check.error', res);
             btn.disabled = false;
             return;
         }
         const status = data.source_check?.status;
-        const points = data.points_earned ? ` +${data.points_earned} reputation.` : '';
-        const msg = status === 'verified' ? `Source verified.${points}`
-            : status === 'needs_work' ? `Flagged: sources need work.${points}`
-            : 'Check saved. One more settles it.';
+        const points = data.points_earned ? t('check.points', { n: data.points_earned }) : '';
+        const msg = status === 'verified' ? t('check.verified', { points })
+            : status === 'needs_work' ? t('check.needsWork', { points })
+            : t('check.saved');
         showToast(msg);
         await reloadArgumentDetail();
     } catch (error) {
         console.error('Source check error:', error);
-        showToast('Network error while saving your check.');
+        showToast(t('check.networkError'));
         btn.disabled = false;
     }
 }
 
 function buildRateRow(rateRow, counterArgumentId, personaId) {
-    rateRow.innerHTML = '<span class="rate-label">Would this work?</span>';
+    rateRow.innerHTML = `<span class="rate-label">${escapeHtml(t('rate.prompt'))}</span>`;
     const starWrap = document.createElement('span');
     starWrap.className = 'rate-stars';
     for (let i = 1; i <= 5; i++) {
@@ -3353,7 +3649,7 @@ function buildRateRow(rateRow, counterArgumentId, personaId) {
         star.type = 'button';
         star.className = 'rate-star';
         star.textContent = '★';
-        star.setAttribute('aria-label', `${i} star${i === 1 ? '' : 's'}`);
+        star.setAttribute('aria-label', t('rate.star', { n: i }));
         star.addEventListener('mouseenter', () => highlightStars(starWrap, i));
         star.addEventListener('mouseleave', () => highlightStars(starWrap, 0));
         star.addEventListener('click', () => submitRating(counterArgumentId, personaId, i, rateRow));
@@ -3381,23 +3677,20 @@ async function submitRating(counterArgumentId, personaId, score, rateRow) {
         });
         const data = await res.json();
         if (res.ok) {
-            rateRow.innerHTML = `<span class="rate-thanks">Thanks — rated ${score}★</span>`;
+            rateRow.innerHTML = `<span class="rate-thanks">${escapeHtml(t('rate.thanks', { n: score }))}</span>`;
             if (data.pending) {
                 pendingVotes = data.pending_count;
-                const n = data.pending_count;
-                showToast(`Vote saved. Create a free account and your ${n} vote${n === 1 ? '' : 's'} will count.`,
-                    { actionLabel: 'Create account', actionHref: authHref('register.html'), duration: 8000 });
+                showToast(t('votes.pendingToast', { n: data.pending_count }),
+                    { actionLabel: t('common.createAccount'), actionHref: authHref('register.html'), duration: 8000 });
             } else {
-                showToast('Rating saved. Have you tried this one for real?');
+                showToast(t('rate.saved'));
             }
-        } else if (data.needs_account) {
-            showToast(data.error, { actionLabel: 'Create account', actionHref: authHref('register.html'), duration: 8000 });
         } else {
-            showToast(data.error || 'Could not save rating.');
+            apiErrorToast(data, 'rate.error', res);
         }
     } catch (error) {
         console.error('Rating error:', error);
-        showToast('Network error while saving rating.');
+        showToast(t('rate.networkError'));
     }
 }
 
@@ -3412,7 +3705,7 @@ function hostnameOf(url) {
     try {
         return new URL(url).hostname.replace(/^www\./, '');
     } catch (e) {
-        return 'Source';
+        return t('common.source');
     }
 }
 
@@ -3438,7 +3731,7 @@ function renderGaps() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'gap-chip';
-        btn.innerHTML = `${icon('pen')} Write for ${escapeHtml(p.name)}`;
+        btn.innerHTML = `${icon('pen')} ${escapeHtml(t('claim.writeFor', { name: p.name }))}`;
         btn.addEventListener('click', () => openComposer(argDetailState.argumentId, p.id));
         gapsList.appendChild(btn);
     });
@@ -3450,9 +3743,9 @@ function initComposer() {
     const composerPersona = document.getElementById('composerPersona');
     if (composerPersona) {
         // A debunk targets exactly one persona — no "general" default.
-        composerPersona.innerHTML = '<option value="" disabled selected>Choose a personality…</option>' +
+        composerPersona.innerHTML = `<option value="" disabled selected>${escapeHtml(t('composer.choosePersona'))}</option>` +
             argDetailState.namedPersonas
-                .map((p) => `<option value="${p.id}">${escapeHtml(p.name || 'Profile')}</option>`)
+                .map((p) => `<option value="${p.id}">${escapeHtml(p.name || t('personas.fallbackName'))}</option>`)
                 .join('');
     }
 
@@ -3472,7 +3765,7 @@ function addComposerSourceInput(value = '') {
     const input = document.createElement('input');
     input.type = 'url';
     input.className = 'composer-source-input';
-    input.placeholder = 'https://example.com/evidence';
+    input.placeholder = t('composer.sourcePlaceholder');
     input.value = value;
     container.appendChild(input);
     input.focus();
@@ -3481,12 +3774,12 @@ function addComposerSourceInput(value = '') {
 function resetComposerSources() {
     const container = document.getElementById('composerSources');
     if (!container) return;
-    container.innerHTML = '<input type="url" class="composer-source-input" placeholder="https://example.com/evidence">';
+    container.innerHTML = `<input type="url" class="composer-source-input" placeholder="${escapeHtml(t('composer.sourcePlaceholder'))}">`;
 }
 
 function openComposer(argumentId, personaId = '', prefillText = '') {
     if (!currentUser) {
-        showToast('Log in to contribute a response.', { actionLabel: 'Log in', actionHref: authHref() });
+        showToast(t('composer.loginToast'), { actionLabel: t('common.login'), actionHref: authHref() });
         return;
     }
     const panel = document.getElementById('composerPanel');
@@ -3499,15 +3792,16 @@ function openComposer(argumentId, personaId = '', prefillText = '') {
     if (personaSelect) personaSelect.value = (personaId !== '' && personaId != null) ? String(personaId) : '';
     document.getElementById('composerText').value = prefillText || '';
     resetComposerSources();
+    showComposerSourceError(false);
     if (message) { message.textContent = ''; message.className = 'form-message'; }
 
     const persona = argDetailState.personas.find((p) => String(p.id) === String(personaId));
     if (persona && persona.description) {
-        title.textContent = `Write a response for ${persona.name}`;
-        hint.textContent = `Tip — ${persona.name}: ${persona.description}. Speak to what they value.`;
+        title.textContent = t('composer.titleFor', { name: persona.name });
+        hint.textContent = t('composer.hint', { name: persona.name, description: String(persona.description).replace(/[.\s]+$/, '') });
         hint.style.display = 'block';
     } else {
-        title.textContent = prefillText ? 'Propose an improved response' : 'Write a response';
+        title.textContent = t(prefillText ? 'composer.titleImprove' : 'composer.title');
         hint.style.display = 'none';
     }
 
@@ -3531,6 +3825,32 @@ function closeComposer() {
     if (backdrop) backdrop.style.display = 'none';
 }
 
+// What the backend accepts as a source: an absolute http(s) address.
+function isWebLink(url) {
+    try {
+        const u = new URL(String(url || '').trim());
+        return (u.protocol === 'http:' || u.protocol === 'https:') && Boolean(u.hostname);
+    } catch (_) {
+        return false;
+    }
+}
+
+// The API's 400 for a link that isn't http(s) (see URL_ERROR in argumentation_store.py).
+function isLinkError(data) {
+    return /http:\/\/ or https:\/\//.test(String(data?.error || ''));
+}
+
+function showComposerSourceError(show) {
+    const el = document.getElementById('composerSourcesError');
+    if (!el) return;
+    el.textContent = show ? t('composer.sourceInvalid') : '';
+    el.hidden = !show;
+    document.querySelectorAll('.composer-source-input').forEach((input) => {
+        const bad = show && input.value.trim() && !isWebLink(input.value);
+        input.setAttribute('aria-invalid', bad ? 'true' : 'false');
+    });
+}
+
 async function submitComposer(e) {
     e.preventDefault();
     const message = document.getElementById('composerMessage');
@@ -3542,13 +3862,19 @@ async function submitComposer(e) {
         .filter(Boolean);
 
     if (!text) {
-        message.textContent = 'Please write a response.';
+        message.textContent = t('composer.needText');
         message.className = 'form-message error';
         return;
     }
     if (!personaVal) {
-        message.textContent = 'Please choose who this response is for.';
+        message.textContent = t('composer.needPersona');
         message.className = 'form-message error';
+        return;
+    }
+    showComposerSourceError(sources.some((u) => !isWebLink(u)));
+    if (sources.some((u) => !isWebLink(u))) {
+        message.textContent = '';
+        message.className = 'form-message';
         return;
     }
 
@@ -3560,7 +3886,7 @@ async function submitComposer(e) {
     };
 
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Publishing…';
+    submitBtn.textContent = t('composer.publishing');
     try {
         const res = await fetch(`${API_BASE_URL}/counter-arguments`, {
             method: 'POST',
@@ -3571,19 +3897,21 @@ async function submitComposer(e) {
         const data = await res.json();
         if (res.ok) {
             closeComposer();
-            showToast('Response published — thank you for contributing!');
+            showToast(t('composer.published'));
             await reloadArgumentDetail();
+        } else if (isLinkError(data)) {
+            showComposerSourceError(true);
         } else {
-            message.textContent = data.error || 'Could not publish response.';
+            message.textContent = apiError(data, 'composer.error');
             message.className = 'form-message error';
         }
     } catch (error) {
         console.error('Composer error:', error);
-        message.textContent = 'Network error. Please try again.';
+        message.textContent = t('common.networkError');
         message.className = 'form-message error';
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Publish for review';
+        submitBtn.textContent = t('composer.submit');
     }
 }
 
@@ -3614,7 +3942,7 @@ async function initBlogArticlesPage() {
         if (!Array.isArray(allBlogResources)) allBlogResources = [];
 
         const topicOptions = [...new Set(allBlogResources.flatMap((r) => r.tags || []).filter(Boolean))]
-            .sort().map((t) => ({ value: t, label: capitalizeWords(t) }));
+            .sort((a, b) => a.localeCompare(b, LANG)).map((tag) => ({ value: tag, label: topicLabel(tag) }));
 
         // Arriving from Profile via resources.html?tag=… pre-selects that topic.
         const requestedTag = new URLSearchParams(window.location.search).get('tag');
@@ -3624,15 +3952,15 @@ async function initBlogArticlesPage() {
         blogState.topics = new Set(seed);
 
         createFilterBar(document.getElementById('blogControls'), {
-            facets: [{ id: 'topic', label: 'Topic', icon: icon('tag'), options: topicOptions, selected: seed }],
+            facets: [{ id: 'topic', label: t('filter.topic'), icon: icon('tag'), options: topicOptions, selected: seed }],
             sort: {
-                label: 'Sort', value: blogState.sort, options: [
-                    { value: 'rating', label: 'Effectiveness' },
-                    { value: 'date', label: 'Most recent' },
-                    { value: 'title', label: 'A–Z' },
+                label: t('filter.sort'), value: blogState.sort, options: [
+                    { value: 'rating', label: t('articles.sortRating') },
+                    { value: 'date', label: t('articles.sortRecent') },
+                    { value: 'title', label: t('articles.sortTitle') },
                 ],
             },
-            search: { placeholder: 'Search articles…' },
+            search: { placeholder: t('articles.search') },
             onChange: (s) => {
                 blogState.topics = new Set(s.facets.topic);
                 blogState.sort = s.sort;
@@ -3647,7 +3975,7 @@ async function initBlogArticlesPage() {
         console.error('Error loading resources:', error);
         if (loadingMessage) loadingMessage.style.display = 'none';
         if (errorMessage) {
-            errorMessage.textContent = 'Failed to load resources. Please try again later.';
+            errorMessage.textContent = t('articles.loadError');
             errorMessage.style.display = 'block';
         }
     }
@@ -3665,7 +3993,7 @@ function filterAndDisplayBlogResources() {
     if (blogState.sort === 'rating') {
         filtered.sort((a, b) => (b.effectiveness_rating || 0) - (a.effectiveness_rating || 0));
     } else if (blogState.sort === 'title') {
-        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || '', LANG));
     } else {
         filtered.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     }
@@ -3701,7 +4029,7 @@ function createResourceCard(resource) {
     
     const tagsHTML = resource.tags && resource.tags.length > 0
         ? `<div class="card-tags">${resource.tags.map(tag => 
-            `<span class="tag">${capitalizeWords(tag)}</span>`
+            `<span class="tag">${escapeHtml(topicLabel(tag))}</span>`
           ).join('')}</div>`
         : '';
     
@@ -3715,13 +4043,13 @@ function createResourceCard(resource) {
         : '';
 
     const sourceHTML = isInternalArticle
-        ? `<div class="card-source"><a href="${articleViewerUrl}">Read article</a></div>`
-        : (resource.source 
-            ? `<div class="card-source"><a href="${resource.source}" target="_blank" rel="noopener noreferrer">View source</a></div>`
+        ? `<div class="card-source"><a href="${articleViewerUrl}">${escapeHtml(t('articles.read'))}</a></div>`
+        : (safeHref(resource.source)
+            ? `<div class="card-source"><a href="${escapeHtml(safeHref(resource.source))}" target="_blank" rel="noopener noreferrer">${escapeHtml(t('common.viewSource'))}</a></div>`
             : '');
     
     const dateHTML = resource.date 
-        ? `<div class="card-date">${new Date(resource.date).toLocaleDateString()}</div>`
+        ? `<div class="card-date">${escapeHtml(formatDate(resource.date))}</div>`
         : '';
     
     // Author info: prefer db-backed user link; otherwise fall back to the resource's author string.
@@ -3730,22 +4058,22 @@ function createResourceCard(resource) {
         ? userAvatarHtml(resource.user_id, resource.username, 'avatar-xs')
         : '';
     const contributorHTML = resource.user_id && resource.username
-        ? `<a href="profile.html?id=${resource.user_id}" class="contributor-link">${avatar}<span class="contributor-name">By ${resource.username}</span></a>`
+        ? `<a href="profile.html?id=${resource.user_id}" class="contributor-link">${avatar}<span class="contributor-name">${escapeHtml(t('common.by', { name: resource.username }))}</span></a>`
         : (authorName
-            ? `<span class="anonymous-contributor">By ${authorName}</span>`
-            : '<span class="anonymous-contributor">By Anonymous</span>');
+            ? `<span class="anonymous-contributor">${escapeHtml(t('common.by', { name: authorName }))}</span>`
+            : `<span class="anonymous-contributor">${escapeHtml(t('articles.anonymous'))}</span>`);
     
     const titleHTML = isInternalArticle
-        ? `<a class="card-title-link" href="${articleViewerUrl}"><h3 class="card-title">${resource.title || 'Untitled'}</h3></a>`
-        : `<h3 class="card-title">${resource.title || 'Untitled'}</h3>`;
+        ? `<a class="card-title-link" href="${articleViewerUrl}"><h3 class="card-title">${escapeHtml(resource.title || t('common.untitled'))}</h3></a>`
+        : `<h3 class="card-title">${escapeHtml(resource.title || t('common.untitled'))}</h3>`;
 
     card.innerHTML = `
         <div class="card-header">
             ${titleHTML}
-            <span class="effectiveness-badge">★ ${resource.effectiveness_rating || 0}/10</span>
+            <span class="effectiveness-badge">★ ${escapeHtml(String(resource.effectiveness_rating || 0))}/10</span>
         </div>
-        ${resource.narrative ? `<div class="card-narrative">"${resource.narrative}"</div>` : ''}
-        <div class="card-summary">${resource.summary || resource.counter_argument || ''}</div>
+        ${resource.narrative ? `<div class="card-narrative">“${escapeHtml(resource.narrative)}”</div>` : ''}
+        <div class="card-summary">${escapeHtml(resource.summary || resource.counter_argument || '')}</div>
         ${tagsHTML}
         <div class="card-meta">
             <div class="card-contributor">${contributorHTML}</div>
@@ -3792,7 +4120,7 @@ async function handleAdminLogin(e) {
     const loginBtn = document.querySelector('#adminLoginForm button[type="submit"]');
     
     loginBtn.disabled = true;
-    loginBtn.textContent = 'Logging in...';
+    loginBtn.textContent = t('common.loggingIn');
     
     try {
         const response = await fetch(`${API_BASE_URL}/admin/login`, {
@@ -3812,16 +4140,16 @@ async function handleAdminLogin(e) {
             loadSubmissions();
             initResourceReview();
         } else {
-            loginMessage.textContent = data.error || 'Invalid password';
+            loginMessage.textContent = apiError(data, 'admin.invalidPassword');
             loginMessage.className = 'form-message error';
         }
     } catch (error) {
         console.error('Login error:', error);
-        loginMessage.textContent = 'Network error. Please try again.';
+        loginMessage.textContent = t('common.networkError');
         loginMessage.className = 'form-message error';
     } finally {
         loginBtn.disabled = false;
-        loginBtn.textContent = 'Login';
+        loginBtn.textContent = t('common.login');
     }
 }
 
@@ -3837,6 +4165,16 @@ function handleAdminLogout() {
     sessionStorage.removeItem('adminToken');
     document.querySelector('.admin-login').style.display = 'block';
     document.querySelector('.admin-content').classList.remove('active');
+}
+
+// The admin token expired (API 401 admin_auth_required): back to the password form.
+function adminSessionExpired() {
+    handleAdminLogout();
+    const msg = document.getElementById('loginMessage');
+    if (msg) {
+        msg.textContent = t('error.admin_auth_required');
+        msg.className = 'form-message error';
+    }
 }
 
 function showAdminContent() {
@@ -3857,6 +4195,7 @@ async function loadSubmissions() {
             }
         });
         
+        if (response.status === 401) return adminSessionExpired();
         if (!response.ok) {
             throw new Error('Failed to load submissions');
         }
@@ -3866,7 +4205,7 @@ async function loadSubmissions() {
         loadingMessage.style.display = 'none';
         
         if (submissions.length === 0) {
-            submissionsList.innerHTML = '<p class="empty-message">No submissions yet.</p>';
+            submissionsList.innerHTML = `<p class="empty-message">${escapeHtml(t('admin.submissionsEmpty'))}</p>`;
             return;
         }
         
@@ -3884,69 +4223,78 @@ async function loadSubmissions() {
         
     } catch (error) {
         console.error('Error loading submissions:', error);
-        loadingMessage.textContent = 'Failed to load submissions.';
+        loadingMessage.textContent = t('admin.submissionsLoadError');
     }
 }
 
 function createSubmissionCard(submission) {
-    const date = new Date(submission.submitted_at).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    
+    const date = escapeHtml(formatDateTime(submission.submitted_at));
     const statusClass = submission.status || 'pending';
-    const source = submission.source ? escapeHtml(submission.source) : 'N/A';
-    
+    const statusLabel = { pending: 'admin.statusPending', approved: 'admin.statusApproved', rejected: 'admin.statusRejected' }[statusClass];
+    const e = (key, vars) => escapeHtml(t(key, vars));
+
+    const urls = (Array.isArray(submission.sources) && submission.sources.length)
+        ? submission.sources
+        : (submission.source ? [submission.source] : []);
+    const sources = urls.length
+        ? urls.map((u) => (safeHref(u)
+            ? `<a href="${escapeHtml(safeHref(u))}" target="_blank" rel="noopener noreferrer">${escapeHtml(u)}</a>`
+            : escapeHtml(u))).join('<br>')
+        : e('admin.notProvided');
+
+    const author = submission.user_id && submission.username
+        ? `<a href="profile.html?id=${encodeURIComponent(submission.user_id)}">${escapeHtml(submission.username)}</a>`
+        : e('contrib.anonymous');
+
+    const claimLink = submission.argument_id != null
+        ? `<a href="argument.html?id=${encodeURIComponent(submission.argument_id)}">${escapeHtml(submission.narrative || '')}</a>`
+        : escapeHtml(submission.narrative || '');
+    const newClaim = submission.argument_is_new ? ` <span class="submission-new">${e('admin.newClaim')}</span>` : '';
+
+    // Tags are the only thing an admin adds on approval (they go on the claim).
     const actions = submission.status === 'pending' ? `
         <div class="submission-actions">
-            <button class="btn btn-primary btn-approve" data-id="${submission.id}">Approve</button>
-            <button class="btn btn-secondary btn-reject" data-id="${submission.id}">Reject</button>
+            <button class="btn btn-primary btn-approve" data-id="${submission.id}">${e('admin.approve')}</button>
+            <button class="btn btn-secondary btn-reject" data-id="${submission.id}">${e('admin.reject')}</button>
         </div>
         <div class="approval-form" id="approval-form-${submission.id}">
-            <h4>Approval Details</h4>
             <div class="form-group">
-                <label>Title:</label>
-                <input type="text" class="approval-title" placeholder="Counter-Argument Title" />
-            </div>
-            <div class="form-group">
-                <label>Effectiveness Rating (0-10):</label>
-                <input type="number" class="approval-rating" min="0" max="10" value="5" />
-            </div>
-            <div class="form-group">
-                <label>Tags (comma-separated):</label>
-                <input type="text" class="approval-tags" placeholder="e.g., immigration, economy, climate" />
+                <label for="approval-tags-${submission.id}">${e('admin.fieldTags')}</label>
+                <input type="text" class="approval-tags" id="approval-tags-${submission.id}"
+                       value="${escapeHtml((submission.tags || []).join(', '))}" placeholder="${e('admin.fieldTagsPlaceholder')}" />
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary btn-confirm-approve" data-id="${submission.id}">Confirm Approval</button>
-                <button class="btn btn-secondary btn-cancel-approve" data-id="${submission.id}">Cancel</button>
+                <button class="btn btn-primary btn-confirm-approve" data-id="${submission.id}">${e('admin.confirmApproval')}</button>
+                <button class="btn btn-secondary btn-cancel-approve" data-id="${submission.id}">${e('common.cancel')}</button>
             </div>
         </div>
     ` : '';
-    
+
     return `
         <div class="submission-card ${statusClass}">
             <div class="submission-header">
-                <strong>Submission #${submission.id}</strong>
-                <span class="submission-status ${statusClass}">${capitalizeWords(statusClass)}</span>
+                <strong>${e('admin.submissionNumber', { id: submission.id })}</strong>
+                <span class="submission-status ${statusClass}">${statusLabel ? e(statusLabel) : escapeHtml(capitalizeWords(statusClass))}</span>
             </div>
             <div class="submission-content">
                 <div class="submission-field">
-                    <strong>Narrative:</strong>
-                    <p>${escapeHtml(submission.narrative)}</p>
+                    <strong>${e('admin.claim')}</strong>
+                    <p>${claimLink}${newClaim}</p>
                 </div>
                 <div class="submission-field">
-                    <strong>Counter-Argument:</strong>
-                    <p>${escapeHtml(submission.counter_argument)}</p>
+                    <strong>${e('admin.response')}</strong>
+                    <p>${escapeHtml(submission.counter_argument || '')}</p>
                 </div>
                 <div class="submission-field">
-                    <strong>Source:</strong>
-                    <p>${source}</p>
+                    <strong>${e('admin.source')}</strong>
+                    <p>${sources}</p>
                 </div>
                 <div class="submission-field">
-                    <strong>Submitted:</strong>
+                    <strong>${e('admin.author')}</strong>
+                    <p>${author}</p>
+                </div>
+                <div class="submission-field">
+                    <strong>${e('admin.submitted')}</strong>
                     <p>${date}</p>
                 </div>
             </div>
@@ -3980,17 +4328,10 @@ function attachSubmissionEventListeners() {
             const submissionId = e.target.dataset.id;
             const form = document.getElementById(`approval-form-${submissionId}`);
             
-            const title = form.querySelector('.approval-title').value.trim();
-            const rating = parseInt(form.querySelector('.approval-rating').value);
             const tagsInput = form.querySelector('.approval-tags').value.trim();
-            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()) : [];
-            
-            if (!title) {
-                alert('Please enter a title');
-                return;
-            }
-            
-            await approveSubmission(submissionId, { title, effectiveness_rating: rating, tags });
+            const tags = tagsInput ? tagsInput.split(',').map((tag) => tag.trim()).filter(Boolean) : [];
+
+            await approveSubmission(submissionId, { tags });
         });
     });
     
@@ -3998,7 +4339,7 @@ function attachSubmissionEventListeners() {
     document.querySelectorAll('.btn-reject').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const submissionId = e.target.dataset.id;
-            if (confirm('Are you sure you want to reject this submission?')) {
+            if (confirm(t('admin.confirmReject'))) {
                 await rejectSubmission(submissionId);
             }
         });
@@ -4017,15 +4358,15 @@ async function approveSubmission(submissionId, data) {
         });
         
         if (response.ok) {
-            alert('Submission approved successfully!');
+            alert(t('admin.approved'));
             loadSubmissions(); // Reload submissions
         } else {
             const error = await response.json();
-            alert('Failed to approve submission: ' + (error.error || 'Unknown error'));
+            alert(t('admin.approveFailed', { error: error.error || t('admin.unknownError') }));
         }
     } catch (error) {
         console.error('Error approving submission:', error);
-        alert('Network error. Please try again.');
+        alert(t('common.networkError'));
     }
 }
 
@@ -4039,15 +4380,15 @@ async function rejectSubmission(submissionId) {
         });
         
         if (response.ok) {
-            alert('Submission rejected.');
+            alert(t('admin.rejected'));
             loadSubmissions(); // Reload submissions
         } else {
             const error = await response.json();
-            alert('Failed to reject submission: ' + (error.error || 'Unknown error'));
+            alert(t('admin.rejectFailed', { error: error.error || t('admin.unknownError') }));
         }
     } catch (error) {
         console.error('Error rejecting submission:', error);
-        alert('Network error. Please try again.');
+        alert(t('common.networkError'));
     }
 }
 
@@ -4077,6 +4418,25 @@ function userAvatarHtml(userId, username, sizeClass = 'avatar-sm') {
 // Utility Functions
 // ========================================
 
+// A link from user data, or null if it isn't a plain web link. Only http(s)
+// (absolute, or relative to this site) may go in an href: this rules out
+// `javascript:`, `data:` and similar schemes that would run on click.
+function safeHref(url) {
+    const raw = String(url ?? '').trim();
+    if (!raw) return null;
+    try {
+        const u = new URL(raw, window.location.href);
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? raw : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Lower-case and strip accents, so "écolo", "ecolo" and "Écolo" all match.
+function normalizeSearch(text) {
+    return String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -4092,10 +4452,15 @@ function formatClaimText(text) {
     return escapeHtml(String(text || '')).replace(/\//g, '/<wbr>');
 }
 
+// Claim text between curly quotes, dropping any quotes already around it.
+function quotedClaimHtml(text) {
+    return `“${formatClaimText(String(text || '').trim().replace(/^[«"“”'\s]+|[»"“”'\s]+$/g, ''))}”`;
+}
+
 const __searchTextCache = new WeakMap();
 
 function getSearchTerms(query) {
-    const normalized = String(query || '').toLowerCase().trim();
+    const normalized = normalizeSearch(query);
     if (!normalized) return [];
     return normalized.split(/\s+/).filter(Boolean);
 }
@@ -4131,13 +4496,13 @@ function buildSearchText(value, visited) {
 
 function getCachedSearchText(item) {
     if (!item || typeof item !== 'object') {
-        return buildSearchText(item).toLowerCase();
+        return normalizeSearch(buildSearchText(item));
     }
 
     const cached = __searchTextCache.get(item);
     if (cached) return cached;
 
-    const computed = buildSearchText(item).toLowerCase();
+    const computed = normalizeSearch(buildSearchText(item));
     __searchTextCache.set(item, computed);
     return computed;
 }
@@ -4149,7 +4514,8 @@ function itemMatchesSearchTerms(item, terms) {
 }
 
 function capitalizeWords(str) {
-    return str.replace(/\b\w/g, char => char.toUpperCase());
+    // Unicode-aware, so accented words stay intact ("énergie" → "Énergie", not "éNergie").
+    return String(str).replace(/(^|[^\p{L}\p{N}'’])(\p{L})/gu, (m, before, letter) => before + letter.toUpperCase());
 }
 
 // ========================================
@@ -4171,6 +4537,11 @@ const LIBRARY_TYPE_ICONS = {
     dataset: 'trend',
     website: 'globe',
 };
+
+// Type names come from the API in English; the catalog has them by type id.
+function libraryTypeLabel(type, fallback) {
+    return tOr(`libraryType.${type}`, fallback || capitalizeWords(String(type || '')));
+}
 
 // Client-side filter state: sets so every facet is multi-select, matching the
 // Home feed. The library is small enough to fetch once and filter in the page.
@@ -4205,18 +4576,18 @@ async function initLibraryPage() {
 
         libraryBar = createFilterBar(document.getElementById('libraryControls'), {
             facets: [
-                { id: 'type', label: 'Type', icon: icon('file'), options: libraryFacetOptions('type'), selected: [...libraryState.type] },
-                { id: 'topic', label: 'Topic', icon: icon('tag'), options: libraryFacetOptions('topic') },
-                { id: 'publisher', label: 'Publisher', icon: icon('building'), options: libraryFacetOptions('publisher') },
+                { id: 'type', label: t('filter.type'), icon: icon('file'), options: libraryFacetOptions('type'), selected: [...libraryState.type] },
+                { id: 'topic', label: t('filter.topic'), icon: icon('tag'), options: libraryFacetOptions('topic') },
+                { id: 'publisher', label: t('filter.publisher'), icon: icon('building'), options: libraryFacetOptions('publisher') },
             ],
             sort: {
-                label: 'Sort', value: libraryState.sort, options: [
-                    { value: 'used', label: 'Most cited' },
-                    { value: 'recent', label: 'Most recent' },
-                    { value: 'title', label: 'A–Z' },
+                label: t('filter.sort'), value: libraryState.sort, options: [
+                    { value: 'used', label: t('library.sortCited') },
+                    { value: 'recent', label: t('library.sortRecent') },
+                    { value: 'title', label: t('library.sortTitle') },
                 ],
             },
-            search: { placeholder: 'Search resources…' },
+            search: { placeholder: t('library.search') },
             onChange: (s) => {
                 libraryState.type = new Set(s.facets.type);
                 libraryState.topic = new Set(s.facets.topic);
@@ -4233,7 +4604,7 @@ async function initLibraryPage() {
         console.error('Library error:', error);
         if (loadingMessage) loadingMessage.style.display = 'none';
         if (errorMessage) {
-            errorMessage.textContent = 'Could not load the resource library. Please try again.';
+            errorMessage.textContent = t('library.loadError');
             errorMessage.style.display = 'block';
         }
     }
@@ -4257,15 +4628,15 @@ function libraryFacetOptions(facet) {
     // Keep any currently-selected value visible even at count 0.
     libraryState[facet].forEach((v) => { if (!counts.has(v)) counts.set(v, 0); });
 
-    const label = (v) => facet === 'type' ? capitalizeWords(v) : v;
+    const label = (v) => facet === 'type' ? libraryTypeLabel(v) : (facet === 'topic' ? topicLabel(v) : v);
     return [...counts.entries()]
-        .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+        .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), LANG))
         .map(([value, count]) => ({ value, label: label(value), count }));
 }
 
 // Apply the active facets/search; `except` skips one facet (for its own counts).
 function filterLibrary({ except = null } = {}) {
-    const q = libraryState.q.trim().toLowerCase();
+    const q = normalizeSearch(libraryState.q);
     return allLibraryResources.filter((r) => {
         for (const facet of ['type', 'topic', 'publisher']) {
             if (facet === except) continue;
@@ -4273,7 +4644,7 @@ function filterLibrary({ except = null } = {}) {
             if (sel.size && !libraryFacetValues(r, facet).some((v) => sel.has(v))) return false;
         }
         if (q) {
-            const hay = `${r.title || ''} ${r.description || ''} ${r.publisher || ''} ${(r.topics || []).join(' ')}`.toLowerCase();
+            const hay = normalizeSearch(`${r.title || ''} ${r.description || ''} ${r.publisher || ''} ${(r.topics || []).join(' ')} ${(r.topics || []).map(topicLabel).join(' ')}`);
             if (!hay.includes(q)) return false;
         }
         return true;
@@ -4287,10 +4658,10 @@ function renderLibrary() {
     if (libraryState.sort === 'recent') {
         resources.sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')));
     } else if (libraryState.sort === 'title') {
-        resources.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+        resources.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), LANG));
     } else {
         resources.sort((a, b) => (b.used_in_responses || 0) - (a.used_in_responses || 0)
-            || String(a.title || '').localeCompare(String(b.title || '')));
+            || String(a.title || '').localeCompare(String(b.title || ''), LANG));
     }
 
     // Refresh facet option counts to reflect the new selection.
@@ -4312,9 +4683,9 @@ function renderLibraryStats(resources) {
     // Tiles describe what's on screen, not the whole library — the page opens
     // filtered, so a total here would understate the collection.
     const tiles = [
-        { n: resources.length, label: 'resources shown' },
-        { n: publishers.size, label: 'publishers' },
-        { n: cited, label: 'cited in responses' },
+        { n: resources.length, label: t('library.statShown', { n: resources.length }) },
+        { n: publishers.size, label: t('library.statPublishers', { n: publishers.size }) },
+        { n: cited, label: t('library.statCited', { n: cited }) },
     ];
     statsEl.innerHTML = tiles
         .map((t) => `<div class="stat-tile"><span class="stat-n">${t.n}</span><span class="stat-label">${escapeHtml(t.label)}</span></div>`)
@@ -4336,23 +4707,23 @@ function renderLibraryGrid(resources) {
     resources.forEach((r) => {
         const typeIcon = icon(LIBRARY_TYPE_ICONS[r.type] || 'book');
         const topics = (r.topics || []).slice(0, 4)
-            .map((t) => `<button type="button" class="tag library-topic" data-topic="${escapeHtml(t)}">#${escapeHtml(t)}</button>`)
+            .map((t) => `<button type="button" class="tag library-topic" data-topic="${escapeHtml(t)}">${escapeHtml(topicLabel(t))}</button>`)
             .join('');
 
-        const preview = r.preview_image
-            ? `<img class="library-preview" src="${escapeHtml(r.preview_image)}" alt="" loading="lazy">`
+        const preview = safeHref(r.preview_image)
+            ? `<img class="library-preview" src="${escapeHtml(safeHref(r.preview_image))}" alt="" loading="lazy">`
             : '';
 
         const cited = r.used_in_responses
-            ? `<span class="library-cited">Cited in ${r.used_in_responses} response${r.used_in_responses === 1 ? '' : 's'}</span>`
+            ? `<span class="library-cited">${escapeHtml(t('library.cited', { n: r.used_in_responses }))}</span>`
             : '';
 
         const submitter = r.submitted_by?.username
-            ? `<span class="library-submitter">Shared by ${escapeHtml(r.submitted_by.username)}</span>`
+            ? `<span class="library-submitter">${escapeHtml(t('library.sharedBy', { name: r.submitted_by.username }))}</span>`
             : '';
 
-        const context = r.context_url
-            ? `<a class="library-context" href="${escapeHtml(r.context_url)}" target="_blank" rel="noopener noreferrer">Context ↗</a>`
+        const context = safeHref(r.context_url)
+            ? `<a class="library-context" href="${escapeHtml(safeHref(r.context_url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(t('library.context'))}</a>`
             : '';
 
         const card = document.createElement('article');
@@ -4362,12 +4733,14 @@ function renderLibraryGrid(resources) {
             <div class="library-card-body">
                 <div class="library-card-head">
                     <button type="button" class="library-type-badge" data-type="${escapeHtml(r.type)}">
-                        ${typeIcon} ${escapeHtml(r.type_label || r.type)}
+                        ${typeIcon} ${escapeHtml(libraryTypeLabel(r.type, r.type_label))}
                     </button>
                     <button type="button" class="library-publisher" data-publisher="${escapeHtml(r.publisher)}">${escapeHtml(r.publisher)}</button>
                 </div>
                 <h3 class="library-title">
-                    <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title || r.url)}</a>
+                    ${safeHref(r.url)
+                        ? `<a href="${escapeHtml(safeHref(r.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title || r.url)}</a>`
+                        : escapeHtml(r.title || r.url || '')}
                 </h3>
                 ${r.description ? `<p class="library-description">${escapeHtml(r.description)}</p>` : ''}
                 ${topics ? `<div class="card-tags">${topics}</div>` : ''}
@@ -4406,13 +4779,14 @@ async function loadResourceReviewQueue() {
     if (!queue) return;
 
     const status = document.getElementById('reviewStatusFilter')?.value ?? 'pending';
-    queue.innerHTML = '<p class="loading-message">Loading resources…</p>';
+    queue.innerHTML = `<p class="loading-message">${escapeHtml(t('admin.reviewLoading'))}</p>`;
 
     try {
         const params = status ? `?status=${encodeURIComponent(status)}` : '';
         const response = await fetch(`${API_BASE_URL}/admin/library${params}`, {
             headers: { 'Authorization': `Bearer ${adminToken}` },
         });
+        if (response.status === 401) return adminSessionExpired();
         if (!response.ok) throw new Error(`Request failed: ${response.status}`);
         const data = await response.json();
 
@@ -4420,13 +4794,13 @@ async function loadResourceReviewQueue() {
 
         if (countsEl) {
             const counts = data.counts || {};
-            countsEl.textContent = `${counts.pending || 0} awaiting review · ${counts.approved || 0} approved · ${counts.rejected || 0} rejected`;
+            countsEl.textContent = t('admin.reviewCounts', { pending: counts.pending || 0, approved: counts.approved || 0, rejected: counts.rejected || 0 });
         }
 
         renderResourceReviewQueue(data.resources || []);
     } catch (error) {
         console.error('Review queue error:', error);
-        queue.innerHTML = '<p class="error-message">Could not load resources for review.</p>';
+        queue.innerHTML = `<p class="error-message">${escapeHtml(t('admin.reviewLoadError'))}</p>`;
     }
 }
 
@@ -4435,7 +4809,7 @@ function renderResourceReviewQueue(resources) {
     if (!queue) return;
 
     if (!resources.length) {
-        queue.innerHTML = '<p class="empty-message">Nothing here — the queue is clear.</p>';
+        queue.innerHTML = `<p class="empty-message">${escapeHtml(t('admin.reviewEmpty'))}</p>`;
         return;
     }
 
@@ -4446,41 +4820,44 @@ function renderResourceReviewQueue(resources) {
         const status = r.review?.status || 'pending';
         const reviewers = (r.review?.reviewers || []).map((x) => x.name).join(', ');
         const provenance = r.review?.by_provenance
-            ? `auto-approved by provenance (${escapeHtml((r.origins || []).join(', '))})`
-            : (reviewers ? `reviewed by ${escapeHtml(reviewers)}` : 'never reviewed');
+            ? t('admin.byProvenance', { origins: (r.origins || []).join(', ') })
+            : (reviewers ? t('admin.reviewedBy', { names: reviewers }) : t('admin.neverReviewed'));
+        const statusKey = { pending: 'admin.filterPending', approved: 'admin.statusApproved', rejected: 'admin.statusRejected' }[status];
 
         const typeOptions = adminLibraryTypes
-            .map((t) => `<option value="${escapeHtml(t.value)}"${t.value === r.type ? ' selected' : ''}>${escapeHtml(t.label)}</option>`)
+            .map((ty) => `<option value="${escapeHtml(ty.value)}"${ty.value === r.type ? ' selected' : ''}>${escapeHtml(libraryTypeLabel(ty.value, ty.label))}</option>`)
             .join('');
 
         const item = document.createElement('div');
         item.className = 'review-item';
         item.innerHTML = `
             <div class="review-item-head">
-                <span class="review-status review-status-${escapeHtml(status)}">${escapeHtml(status)}</span>
-                <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title || r.url)}</a>
+                <span class="review-status review-status-${escapeHtml(status)}">${escapeHtml(statusKey ? t(statusKey) : status)}</span>
+                ${safeHref(r.url)
+                    ? `<a href="${escapeHtml(safeHref(r.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title || r.url)}</a>`
+                    : escapeHtml(r.title || r.url || '')}
                 <span class="review-meta">${escapeHtml(r.publisher || '')}</span>
             </div>
             <p class="review-meta">${escapeHtml(r.url)}</p>
             <div class="review-fields">
-                <label>Title
+                <label>${escapeHtml(t('admin.reviewTitle'))}
                     <input type="text" data-field="title" value="${escapeHtml(r.title || '')}">
                 </label>
-                <label>Type
+                <label>${escapeHtml(t('admin.reviewType'))}
                     <select data-field="type">${typeOptions}</select>
                 </label>
-                <label>Topics (comma-separated)
+                <label>${escapeHtml(t('admin.reviewTopics'))}
                     <input type="text" data-field="topics" value="${escapeHtml((r.topics || []).join(', '))}">
                 </label>
-                <label>Description
+                <label>${escapeHtml(t('admin.reviewDescription'))}
                     <input type="text" data-field="description" value="${escapeHtml(r.description || '')}">
                 </label>
             </div>
             <div class="review-actions">
-                <button type="button" class="btn btn-primary" data-action="approved">Approve</button>
-                <button type="button" class="btn btn-secondary" data-action="rejected">Reject</button>
+                <button type="button" class="btn btn-primary" data-action="approved">${escapeHtml(t('admin.approve'))}</button>
+                <button type="button" class="btn btn-secondary" data-action="rejected">${escapeHtml(t('admin.reject'))}</button>
             </div>
-            <p class="review-meta">Cited in ${r.used_in_responses || 0} response(s) · ${provenance}</p>
+            <p class="review-meta">${escapeHtml(t('admin.reviewCited', { n: r.used_in_responses || 0, provenance }))}</p>
         `;
 
         item.querySelectorAll('[data-action]').forEach((btn) => {
@@ -4524,15 +4901,15 @@ async function submitResourceReview(item, url, status) {
         const data = await response.json();
 
         if (!response.ok) {
-            showMessage(data.error || 'Could not save the review.', 'error');
+            showMessage(apiError(data, 'admin.reviewError'), 'error');
             return;
         }
 
-        showMessage(`Resource ${status}.`, 'success');
+        showMessage(t(status === 'approved' ? 'admin.reviewApproved' : 'admin.reviewRejected'), 'success');
         loadResourceReviewQueue();
     } catch (error) {
         console.error('Resource review error:', error);
-        showMessage('Could not reach the server. Please try again.', 'error');
+        showMessage(t('common.serverUnreachable'), 'error');
     } finally {
         buttons.forEach((b) => { b.disabled = false; });
     }
