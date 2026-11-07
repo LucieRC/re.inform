@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype B2 · Mix — re.inform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #f4f5f2; --card: #ffffff; --text: #18201b; --muted: #6b746e; --line: #e4e7e2;
+  --brand: #29683e; --brand-soft: #e3efe6; --tint: #e9ebe6; --line-strong: #d3d7d1; --gold: #d6b969; --shadow: 0 1px 2px rgba(20,30,25,.04), 0 4px 16px rgba(20,30,25,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #0e110f; --card: #171b18; --text: #eaeeeb; --muted: #95a099; --line: #262c28;
+  --brand: #6fbf8a; --brand-soft: #1b2b21; --tint: #1c201d; --line-strong: #323934; --shadow: none;
+}
+* { box-sizing: border-box; margin: 0; }
+p, h1 { overflow-wrap: anywhere; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
+/* Header: clean line (from C) + search bar (from B) + logo (from A) */
+.bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px); }
+.bar-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 28px; }
+.logo { font-weight: 600; font-size: 18px; letter-spacing: -0.02em; }
+.logo span { color: var(--brand); }
+nav { display: flex; gap: 20px; font-size: 15px; color: var(--muted); }
+nav a:hover, nav a[aria-current] { color: var(--text); }
+nav a[aria-current] { font-weight: 500; }
+.search { flex: 1; max-width: 340px; margin-left: auto; position: relative; }
+.search input { width: 100%; height: 40px; border-radius: 12px; border: 1px solid transparent; padding: 0 12px 0 38px; font: inherit; color: var(--text); transition: background .15s, border-color .15s, width .2s; }
+.search input::placeholder { color: var(--muted); }
+.search input:focus { outline: none; border-color: var(--brand); background: var(--card); }
+/* 1 · Tinted: a slightly darker shade of the page, no border */
+body.s1 .search input { background: var(--tint); }
+/* 2 · Outline: transparent, thin line only */
+body.s2 .search input { background: transparent; border-color: var(--line-strong); }
+/* 3 · Minimal: just icon + text, a line appears under it */
+body.s3 .search input { background: transparent; border-radius: 0; border-width: 0 0 1px; border-color: transparent; padding-left: 30px; }
+body.s3 .search svg { left: 4px; }
+body.s3 .search input:hover { border-color: var(--line-strong); }
+body.s3 .search input:focus { background: transparent; border-color: var(--brand); }
+.switch { position: fixed; bottom: 16px; left: 16px; display: flex; gap: 4px; align-items: center; background: var(--text); color: var(--bg); font-size: 12px; padding: 4px 4px 4px 10px; border-radius: 8px; z-index: 20; }
+.switch button { padding: 4px 8px; border-radius: 5px; opacity: .7; }
+.switch button[aria-pressed="true"] { background: var(--bg); color: var(--text); opacity: 1; }
+.search svg { position: absolute; left: 12px; top: 11px; color: var(--muted); }
+.icon-btn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.icon-btn:hover { background: var(--card); color: var(--text); }
+.login { color: var(--muted); font-size: 15px; }
+.login:hover { color: var(--text); }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 24px 80px; }
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 24px 0 28px; flex-wrap: wrap; }
+.intro h1 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; letter-spacing: -0.03em; font-weight: 700; max-width: 620px; }
+.intro p { color: var(--muted); margin-top: 8px; }
+.add { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-weight: 500; }
+.add:hover { color: var(--brand); }
+
+/* Person picker (from A) */
+.label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+.people { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { flex: none; white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-size: 14px; color: var(--muted); border: 1px solid var(--line); background: var(--card); display: inline-flex; align-items: center; gap: 6px; }
+.chip:hover { color: var(--text); border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+.topics { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 24px; }
+.topic { padding: 4px 10px; border-radius: 8px; color: var(--muted); font-size: 14px; }
+.topic:hover { color: var(--text); }
+.topic[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+/* Cards (from B) */
+.grid { columns: 2 340px; column-gap: 16px; }
+.card { break-inside: avoid; display: block; margin-bottom: 16px; background: var(--card); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--line); transition: transform .15s ease, box-shadow .15s ease; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(20,30,25,.08); }
+.claim { font-size: 17px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; }
+.reply { margin-top: 14px; padding: 12px 14px; background: var(--brand-soft); border-radius: 12px; font-size: 14px; }
+.reply b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--brand); margin-bottom: 4px; }
+.reply span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.foot .av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; }
+.foot .tag { margin-left: auto; padding: 2px 8px; border-radius: 6px; background: var(--bg); }
+.more { display: block; margin: 16px auto 0; padding: 10px 20px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-weight: 500; }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+.proto-tag { position: fixed; bottom: 16px; left: 16px; background: var(--text); color: var(--bg); font-size: 12px; padding: 6px 10px; border-radius: 6px; opacity: .85; }
+@media (max-width: 760px) {
+  nav, .login { display: none; }
+  .bar-in { gap: 12px; }
+  .search { max-width: none; }
+}
+</style>
+</head>
+<body class="s1">
+<header class="bar"><div class="bar-in">
+  <a class="logo" href="#">re<span>.</span>inform</a>
+  <nav><a href="#" aria-current="page">Claims</a><a href="#">Personas</a><a href="#">Library</a><a href="#">Articles</a></nav>
+  <label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Search a claim…" aria-label="Search a claim"></label>
+  <a class="login" href="#">Log in</a>
+  <button class="icon-btn" id="theme" aria-label="Toggle dark mode"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z"/></svg></button>
+</div></header>
+
+<main class="wrap">
+  <div class="intro">
+    <div><h1>The claims you'll hear, and how to answer them.</h1>
+    <p>Pick who you're talking to, we'll show the replies that work for them.</p></div>
+    <button class="add"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add a claim</button>
+  </div>
+
+  <p class="label">Who are you talking to?</p>
+  <div class="people" id="people" role="group" aria-label="Filter by person"></div>
+  <div class="topics" id="topics" role="group" aria-label="Filter by topic"></div>
+  <div class="grid" id="list"></div>
+  <button class="more" id="more" hidden>Show more</button>
+</main>
+<div class="switch" id="switch">Search bar:<button data-s="s1" aria-pressed="true">1 · Tinted</button><button data-s="s2" aria-pressed="false">2 · Outline</button><button data-s="s3" aria-pressed="false">3 · Minimal</button></div>
+
+<script src="proto-data.js"></script>
+<script>
+Proto.initTheme(document.getElementById('theme'));
+document.getElementById('switch').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  document.body.className = b.dataset.s;
+  document.querySelectorAll('#switch button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+(async () => {
+  const { claims, personas } = await Proto.load();
+  const state = { q: '', persona: null, tag: null, shown: 12 };
+  const $ = id => document.getElementById(id);
+  const av = p => `<span class="av" style="background:${Proto.colorFor(personas, p.id)}">${Proto.esc(Proto.initials(p.name))}</span>`;
+
+  $('people').innerHTML = `<button class="chip" data-p="" aria-pressed="true">Everyone</button>` +
+    personas.map(p => `<button class="chip" data-p="${p.id}" aria-pressed="false"><span class="dot" style="background:${p.accent_color}"></span>${Proto.esc(p.name)}</button>`).join('');
+  $('topics').innerHTML = `<button class="topic" data-t="" aria-pressed="true">All topics</button>` +
+    Proto.tags(claims).map(t => `<button class="topic" data-t="${t}" aria-pressed="false">${t}</button>`).join('');
+
+  $('people').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return;
+    state.persona = b.dataset.p ? +b.dataset.p : null; state.shown = 12;
+    $('people').querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+  $('topics').addEventListener('click', e => { const b = e.target.closest('.topic'); if (!b) return;
+    state.tag = b.dataset.t || null; state.shown = 12;
+    $('topics').querySelectorAll('.topic').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+  $('q').addEventListener('input', e => { state.q = e.target.value; state.shown = 12; render(); });
+  $('more').addEventListener('click', () => { state.shown += 12; render(); });
+
+  function render() {
+    const rows = Proto.filter(claims, state);
+    $('list').innerHTML = rows.slice(0, state.shown).map(c => {
+      const r = c.top_response, p = c.personas[0];
+      return `<a class="card" href="../argument.html?id=${c.id}">
+        <p class="claim">“${Proto.esc(Proto.clean(c.text))}”</p>
+        ${r ? `<div class="reply"><b>How to answer</b><span>${Proto.esc(r.text)}</span></div>` : ''}
+        <div class="foot">${p ? av(p) + Proto.esc(Proto.firstName(p.name)) : ''} · ${c.counter_argument_count} answer${c.counter_argument_count === 1 ? '' : 's'}
+          ${c.tags[0] ? `<span class="tag">${Proto.esc(c.tags[0])}</span>` : ''}</div></a>`;
+    }).join('') || `<p class="empty">No claim matches. Add it?</p>`;
+    $('more').hidden = rows.length <= state.shown;
+  }
+  render();
+})();
+</script>
+</body>
+</html>

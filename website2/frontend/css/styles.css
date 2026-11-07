@@ -1,3 +1,6 @@
+/* Monochrome emoji font for persona emojis (see .persona-emoji). */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Emoji:wght@600&display=block');
+
 /* ========================================
    re.inform - Simplified Website Styles
    Colors: Green (#29683e) & Gold (#d6b969)
@@ -3089,9 +3092,52 @@ a.archetype-card-link:focus-visible {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.feed-composer:hover {
+button.feed-composer {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.feed-composer:hover,
+.feed-composer:focus-visible {
     border-color: var(--primary-color);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.feed-composer[hidden],
+.feed-composer-form[hidden] {
+    display: none;
+}
+
+.feed-composer-form {
+    margin: 0 0 var(--spacing-sm) 0;
+    padding: 1rem 1.1rem;
+    background: var(--bg-white);
+    border: 1px solid var(--primary-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.feed-composer-form label {
+    display: block;
+    font-weight: 600;
+}
+
+.feed-composer-help {
+    margin: 0.2rem 0 0.6rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+.feed-composer-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    resize: vertical;
 }
 
 .feed-composer-avatar {
@@ -3108,16 +3154,6 @@ a.archetype-card-link:focus-visible {
 
 .feed-composer-prompt {
     flex: 1;
-}
-
-.feed-composer-btn {
-    background: var(--primary-color);
-    color: #fff;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.4rem 0.9rem;
-    border-radius: 999px;
-    flex-shrink: 0;
 }
 
 /* ========================================
@@ -4133,6 +4169,16 @@ a.archetype-card-link:focus-visible {
 .feed-persona-more {
     font-size: 0.78rem;
     color: var(--text-light);
+}
+
+/* Persona emojis: black line-art glyphs from Noto Emoji instead of the
+   system's color emoji. They follow the text color, so dark mode works. */
+.persona-emoji,
+.archetype-emoji,
+.persona-hero-emoji {
+    font-family: 'Noto Emoji', sans-serif;
+    font-weight: 600;
+    color: var(--text-color);
 }
 
 /* Persona emoji chips inside the needs-card (Home feed) */

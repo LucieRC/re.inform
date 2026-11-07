@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype B · Soft cards — re.inform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #f4f5f2; --card: #ffffff; --text: #18201b; --muted: #6b746e; --line: #e4e7e2;
+  --brand: #29683e; --brand-soft: #e3efe6; --gold: #d6b969; --shadow: 0 1px 2px rgba(20,30,25,.04), 0 4px 16px rgba(20,30,25,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #0e110f; --card: #171b18; --text: #eaeeeb; --muted: #95a099; --line: #262c28;
+  --brand: #6fbf8a; --brand-soft: #1b2b21; --shadow: none;
+}
+* { box-sizing: border-box; margin: 0; }
+p, h1 { overflow-wrap: anywhere; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px); }
+.bar-in { max-width: 1120px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 24px; }
+.logo { font-weight: 700; font-size: 18px; letter-spacing: -0.03em; display: flex; align-items: center; gap: 8px; }
+.logo i { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; color: var(--card); font-style: normal; font-size: 14px; }
+nav { display: flex; gap: 2px; background: var(--card); padding: 4px; border-radius: 12px; box-shadow: var(--shadow); }
+nav a { padding: 6px 14px; border-radius: 9px; color: var(--muted); font-weight: 500; font-size: 14px; }
+nav a:hover { color: var(--text); }
+nav a[aria-current] { background: var(--brand-soft); color: var(--brand); }
+.search { flex: 1; max-width: 360px; margin-left: auto; position: relative; }
+.search input { width: 100%; height: 40px; border-radius: 12px; border: 1px solid transparent; background: var(--card); box-shadow: var(--shadow); padding: 0 12px 0 38px; font: inherit; color: var(--text); }
+.search input:focus { outline: none; border-color: var(--brand); }
+.search svg { position: absolute; left: 12px; top: 11px; color: var(--muted); }
+.icon-btn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--muted); background: var(--card); box-shadow: var(--shadow); }
+.btn-primary { background: var(--brand); color: var(--card); padding: 9px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 24px 80px; }
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 24px 0 28px; flex-wrap: wrap; }
+.intro h1 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; letter-spacing: -0.03em; font-weight: 700; max-width: 620px; }
+.intro p { color: var(--muted); margin-top: 8px; }
+.add { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-weight: 500; }
+.add:hover { color: var(--brand); }
+
+/* Persona picker */
+.label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+.people { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+.person { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); border: 2px solid transparent; font-weight: 500; }
+.person .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+.person[aria-pressed="true"] { border-color: var(--brand); }
+.person small { color: var(--muted); font-weight: 400; }
+.topics { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 24px; }
+.topic { padding: 4px 10px; border-radius: 8px; color: var(--muted); font-size: 14px; }
+.topic:hover { color: var(--text); }
+.topic[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+/* Cards */
+.grid { columns: 2 340px; column-gap: 16px; }
+.card { break-inside: avoid; display: block; margin-bottom: 16px; background: var(--card); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--line); transition: transform .15s ease, box-shadow .15s ease; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(20,30,25,.08); }
+.claim { font-size: 17px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; }
+.reply { margin-top: 14px; padding: 12px 14px; background: var(--brand-soft); border-radius: 12px; font-size: 14px; }
+.reply b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--brand); margin-bottom: 4px; }
+.reply span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.foot .av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; }
+.foot .tag { margin-left: auto; padding: 2px 8px; border-radius: 6px; background: var(--bg); }
+.more { display: block; margin: 16px auto 0; padding: 10px 20px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-weight: 500; }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+.proto-tag { position: fixed; bottom: 16px; left: 16px; background: var(--text); color: var(--bg); font-size: 12px; padding: 6px 10px; border-radius: 6px; opacity: .85; }
+@media (max-width: 760px) {
+  nav, .bar .btn-primary { display: none; }
+  .search { max-width: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="logo" href="#"><i>r</i>re.inform</a>
+  <nav><a href="#" aria-current="page">Claims</a><a href="#">Personas</a><a href="#">Library</a><a href="#">Articles</a></nav>
+  <label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Search a claim…" aria-label="Search a claim"></label>
+  <button class="icon-btn" id="theme" aria-label="Toggle dark mode"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 13.2A8.5 8.5 0 0 1 10.8 3 7 7 0 1 0 21 13.2Z"/></svg></button>
+  <a class="btn-primary" href="#">Log in</a>
+</div></header>
+
+<main class="wrap">
+  <div class="intro">
+    <div><h1>The claims you'll hear, and how to answer them.</h1>
+    <p>Pick who you're talking to, we'll show the replies that work for them.</p></div>
+    <button class="add"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add a claim</button>
+  </div>
+
+  <p class="label">Who are you talking to?</p>
+  <div class="people" id="people" role="group" aria-label="Filter by person"></div>
+  <div class="topics" id="topics" role="group" aria-label="Filter by topic"></div>
+  <div class="grid" id="list"></div>
+  <button class="more" id="more" hidden>Show more</button>
+</main>
+<div class="proto-tag">Prototype B · Soft cards</div>
+
+<script src="proto-data.js"></script>
+<script>
+Proto.initTheme(document.getElementById('theme'));
+(async () => {
+  const { claims, personas } = await Proto.load();
+  const state = { q: '', persona: null, tag: null, shown: 12 };
+  const $ = id => document.getElementById(id);
+  const av = (p, cls = 'av') => `<span class="${cls}" style="background:${Proto.colorFor(personas, p.id)}">${Proto.esc(Proto.initials(p.name))}</span>`;
+
+  $('people').innerHTML = `<button class="person" data-p="" aria-pressed="true"><span class="av" style="background:var(--text);color:var(--bg)">∗</span>Anyone</button>` +
+    personas.map(p => `<button class="person" data-p="${p.id}" aria-pressed="false">${av(p)}<span>${Proto.esc(Proto.firstName(p.name))} <small>${Proto.esc(p.short_label || '')}</small></span></button>`).join('');
+  $('topics').innerHTML = `<button class="topic" data-t="" aria-pressed="true">All topics</button>` +
+    Proto.tags(claims).map(t => `<button class="topic" data-t="${t}" aria-pressed="false">${t}</button>`).join('');
+
+  $('people').addEventListener('click', e => { const b = e.target.closest('.person'); if (!b) return;
+    state.persona = b.dataset.p ? +b.dataset.p : null; state.shown = 12;
+    $('people').querySelectorAll('.person').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+  $('topics').addEventListener('click', e => { const b = e.target.closest('.topic'); if (!b) return;
+    state.tag = b.dataset.t || null; state.shown = 12;
+    $('topics').querySelectorAll('.topic').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+  $('q').addEventListener('input', e => { state.q = e.target.value; state.shown = 12; render(); });
+  $('more').addEventListener('click', () => { state.shown += 12; render(); });
+
+  function render() {
+    const rows = Proto.filter(claims, state);
+    $('list').innerHTML = rows.slice(0, state.shown).map(c => {
+      const r = c.top_response, p = c.personas[0];
+      return `<a class="card" href="../argument.html?id=${c.id}">
+        <p class="claim">“${Proto.esc(Proto.clean(c.text))}”</p>
+        ${r ? `<div class="reply"><b>How to answer</b><span>${Proto.esc(r.text)}</span></div>` : ''}
+        <div class="foot">${p ? av(p) + Proto.esc(Proto.firstName(p.name)) : ''} · ${c.counter_argument_count} answer${c.counter_argument_count === 1 ? '' : 's'}
+          ${c.tags[0] ? `<span class="tag">${Proto.esc(c.tags[0])}</span>` : ''}</div></a>`;
+    }).join('') || `<p class="empty">No claim matches. Add it?</p>`;
+    $('more').hidden = rows.length <= state.shown;
+  }
+  render();
+})();
+</script>
+</body>
+</html>

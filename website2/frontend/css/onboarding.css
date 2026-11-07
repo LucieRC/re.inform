@@ -1,6 +1,19 @@
 /* Contribution onboarding: profile picker → tasks → workspace.
    Kept apart from styles.css; uses its tokens so themes apply. */
 
+/* Line icons (see icon() in main.js): stroke in the text color, sized to the text. */
+.icon {
+    width: 1.15em;
+    height: 1.15em;
+    flex-shrink: 0;
+    vertical-align: -0.2em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .onb-step {
     display: flex;
     align-items: center;
@@ -58,7 +71,8 @@
 
 .onb-profile-icon {
     grid-row: span 2;
-    font-size: 1.6rem;
+    display: inline-flex;
+    font-size: 1.5rem;
 }
 
 .onb-profile-title {
@@ -127,34 +141,6 @@
     scroll-margin-top: calc(var(--header-height, 0px) + 1rem);
 }
 
-/* Home page: "help out" strip with one chip per contributor profile. */
-.onb-chips {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.6rem;
-    margin-top: var(--spacing-sm);
-}
-
-.onb-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-height: 44px;
-    padding: 0.5rem 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: 999px;
-    background: var(--bg-white);
-    color: var(--text-color);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.onb-chip:hover,
-.onb-chip:focus-visible {
-    border-color: var(--primary-color);
-}
-
 /* Header: "Contribute" is the one highlighted destination. */
 .nav-links a.nav-cta {
     padding: 0.45rem 1rem;
@@ -167,12 +153,4 @@
 .nav-links a.nav-cta.active {
     color: #fff;
     filter: brightness(1.1);
-}
-
-.home-help {
-    margin-top: var(--spacing-md);
-}
-
-.home-help p {
-    margin-bottom: 0;
 }

@@ -5,3 +5,8 @@ EVS/documentation/
 *.pyc
 *.DS_Store
 website2/QUICKSTART.md
+__pycache__/
+
+# Local user data: accounts (emails, password hashes) and uploaded avatars
+website2/backend/data/users.db
+website2/backend/data/avatars/

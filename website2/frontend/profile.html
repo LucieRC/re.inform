@@ -8,6 +8,7 @@
     <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/roles.css">
 </head>
 <body>
     <header>
@@ -75,6 +76,7 @@
                             <div class="profile-info">
                                 <h2 id="profileUsername">Loading...</h2>
                                 <span id="profileRole" class="role-badge">Member</span>
+                                <div id="profileRoles" class="profile-roles"></div>
                             </div>
                             <!-- Follow button - only shown on other users' profiles -->
                             <div id="followButtonContainer" style="display: none;">
@@ -118,6 +120,16 @@
                             </div>
                         </dl>
 
+                        <!-- Contributor roles: what you do here (own profile only) -->
+                        <div id="rolesSection" class="profile-rail-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Your roles</h3>
+                            </div>
+                            <div id="rolesContent" class="roles-list" aria-live="polite">
+                                <div class="loading-message">Loading roles…</div>
+                            </div>
+                        </div>
+
                         <!-- Your choices live in the rail: topics and people you follow -->
                         <div id="tagsFollowingSection" class="profile-rail-section" style="display: none;">
                             <div class="section-header">
@@ -154,6 +166,15 @@
                             <div id="recommendationsContent" class="needs-help-grid" aria-live="polite">
                                 <div class="loading-message">Finding claims for you…</div>
                             </div>
+                        </div>
+
+                        <!-- Sourcer queue (own profile, Sourcers and moderators only) -->
+                        <div id="sourceQueueSection" class="profile-section" style="display: none;">
+                            <div class="section-header">
+                                <h3>Sources to check</h3>
+                                <p>Debunks waiting for a Sourcer. Open one, follow its links, and say whether they back it up.</p>
+                            </div>
+                            <div id="sourceQueueContent" class="source-queue" aria-live="polite"></div>
                         </div>
 
                         <!-- Activity from people you follow (own profile only) -->

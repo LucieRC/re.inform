@@ -20,12 +20,13 @@ website2/
 │   ├── requirements.txt        # Python dependencies
 │   ├── .env.example           # Environment configuration template
 │   ├── README.md              # Backend documentation
+│   ├── bin/test_data.py       # Flag test data; export a clean data/ for publishing
 │   └── data/
-│       ├── counter-arguments.json  # Approved counter-arguments
+│       ├── argumentation.json      # Claims, responses, resources, ratings
 │       └── submissions.json        # Pending submissions
 └── frontend/
     ├── index.html              # Homepage
-    ├── contribute.html         # Contribution form
+    ├── contribute.html         # Get involved: pick a contributor profile → matching tasks
     ├── explore.html           # Browse counter-arguments
     ├── admin.html             # Admin panel
     ├── css/
@@ -142,7 +143,7 @@ ADMIN_EMAIL=admin@example.com
 
 Data is stored in JSON files in `backend/data/`:
 
-- `counter-arguments.json` - Approved, public counter-arguments
+- `argumentation.json` - Claims, responses, resources and ratings
 - `submissions.json` - Pending and reviewed submissions
 
 **Note**: For production use with high traffic, consider migrating to a proper database (PostgreSQL, MongoDB, etc.)
@@ -221,12 +222,23 @@ Update the Discord link in `frontend/index.html`:
 <a href="https://discord.gg/your-discord-link" class="btn btn-discord">
 ```
 
-### Sample Data
+### Test data
 
-The backend includes 3 sample counter-arguments. You can:
-- Keep them as examples
-- Delete them from `backend/data/counter-arguments.json`
-- Add more samples
+For manual testing, prefer `python bin/test_sandbox.py`: it runs the site on a
+throwaway copy of `data/`, so nothing you do reaches the real files.
+
+Test content that did reach the real data is *flagged*, not deleted, and left out
+when publishing (run from `backend/`):
+
+```bash
+python bin/test_data.py report                  # what is flagged, what looks like a test
+python bin/test_data.py mark-user alice         # flag a test account (and all it creates)
+python bin/test_data.py mark submission 1       # flag one record with no author
+python bin/test_data.py export --out ../publish-data
+```
+
+Deploy `publish-data/` as `backend/data/` on the published site. Anything a flagged
+account posts later is left out automatically.
 
 ## Differences from Original Website
 

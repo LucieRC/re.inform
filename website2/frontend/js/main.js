@@ -11,10 +11,51 @@ const API_BASE_URL = /^https?:$/.test(window.location.protocol)
     ? `${window.location.origin}/api`
     : 'http://localhost:5002/api'; // fallback for pages opened via file://
 
-console.log('API Base URL:', API_BASE_URL);
-
 // Current user state
 let currentUser = null;
+
+// ========================================
+// Icons: monochrome line icons (inline SVG, currentColor) used instead of emoji
+// so they follow the text color in both themes. icon('name') → decorative <svg>.
+// ========================================
+
+const ICON_PATHS = {
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    message: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
+    flask: '<path d="M9 3h6M10 3v6l-5.6 9.6A1.6 1.6 0 0 0 5.8 21h12.4a1.6 1.6 0 0 0 1.4-2.4L14 9V3M7 15h10"/>',
+    pen: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    palette: '<path d="M12 3a9 9 0 0 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A4.6 4.6 0 0 0 21 9.8C21 6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+    code: '<path d="m8 7-5 5 5 5M16 7l5 5-5 5"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+    star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9Z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    book: '<path d="M4 19.5v-15A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5Zm0 0A1.5 1.5 0 0 0 5.5 21H20"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+    chart: '<path d="M4 4v16h16M8 16v-4M12 16V8M16 16v-6"/>',
+    trend: '<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>',
+    check: '<path d="m5 12 5 5 9-10"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+    hourglass: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
+    zap: '<path d="M13 2 4 14h7l-1 8 9-12h-7Z"/>',
+    layers: '<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+    bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/>',
+    tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+    clip: '<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15.5 7"/>',
+    copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+    file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+    video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/>',
+    headphones: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+};
+
+function icon(name) {
+    const paths = ICON_PATHS[name];
+    return paths ? `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>` : '';
+}
 
 function getSelectedTagsFromFilter(selectEl) {
     if (!selectEl) return [];
@@ -281,7 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initProfilePage();
     } else if (currentPage === '' || currentPage.includes('index') || currentPage.includes('home')) {
         // Home is the claims feed — the site's centerpiece.
-        renderHelpProfiles();
+        setupFeedComposer();
         initRespondPage();
     }
 });
@@ -555,7 +596,9 @@ async function initProfilePage() {
         document.getElementById('tagsFollowingSection').style.display = 'block';
         document.getElementById('followingSection').style.display = 'block';
         document.getElementById('contributionsTitle').textContent = 'Your contributions';
+        document.getElementById('rolesSection').style.display = 'block';
         await Promise.all([
+            loadMyRoles(),
             loadRecommendations(),
             loadFollowingActivity(),
             loadFollowedTags(),
@@ -630,11 +673,152 @@ function renderLevelBar(points) {
     track.setAttribute('aria-valuetext', next ? `${current.name}, ${pct}% to ${next.name}` : current.name);
 }
 
+// ---- Contributor roles (function, not rights: see GAMIFICATION_DESIGN.md) ----
+
+function renderRoleChips(roles) {
+    const el = document.getElementById('profileRoles');
+    if (!el) return;
+    el.innerHTML = roles.map((r) => {
+        const confirmed = r.tier === 'confirmed';
+        const title = `${confirmed ? 'Confirmed' : 'Apprentice'} ${r.name}`;
+        return `<span class="role-chip${confirmed ? ' is-confirmed' : ''}" title="${escapeHtml(title)}">
+            ${icon(r.icon)}${escapeHtml(r.name)}${confirmed ? ` ${icon('check')}` : ''}</span>`;
+    }).join('');
+}
+
+async function loadMyRoles() {
+    const container = document.getElementById('rolesContent');
+    if (!container) return;
+    try {
+        const [catalogRes, mineRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/roles`),
+            fetch(`${API_BASE_URL}/me/roles`, { credentials: 'include' }),
+        ]);
+        if (!catalogRes.ok || !mineRes.ok) throw new Error('Failed to load roles');
+        const catalog = await catalogRes.json();
+        const mine = (await mineRes.json()).roles || [];
+        renderMyRoles(catalog, mine);
+
+        const isSourcer = mine.some((r) => r.role === 'sourcer');
+        const canModerate = ['moderator', 'admin'].includes(currentUser?.role);
+        document.getElementById('sourceQueueSection').style.display = (isSourcer || canModerate) ? 'block' : 'none';
+        if (isSourcer || canModerate) loadSourceQueue();
+    } catch (error) {
+        console.error('Roles error:', error);
+        container.innerHTML = '<p class="empty-message">Could not load roles.</p>';
+    }
+}
+
+function renderMyRoles(catalog, mine) {
+    const container = document.getElementById('rolesContent');
+    const held = new Map(mine.map((r) => [r.role, r]));
+
+    container.innerHTML = catalog.map((c) => {
+        const r = held.get(c.role);
+        let body;
+        if (!r) {
+            body = `<p>${escapeHtml(c.duty)}</p>`;
+        } else if (r.tier === 'confirmed') {
+            body = `<p>${escapeHtml(c.power)}</p>`;
+        } else if (r.progress) {
+            const pct = Math.min(100, Math.round((r.progress.done / r.progress.needed) * 100));
+            body = `<p>${escapeHtml(c.duty)}</p>
+                <div class="role-progress">
+                    <div class="level-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"
+                         aria-label="Progress to confirmed ${escapeHtml(c.name)}">
+                        <span class="level-fill" style="width: ${pct}%"></span>
+                    </div>
+                    <span class="role-progress-label">${r.progress.done} / ${r.progress.needed} ${escapeHtml(r.progress.unit)}</span>
+                </div>`;
+        } else {
+            body = `<p>${escapeHtml(c.power)}</p>`;
+        }
+        const privacy = r && !c.public ? '<p>Only you can see this role.</p>' : '';
+        const tier = r ? `<span class="role-tier${r.tier === 'confirmed' ? ' tier-confirmed' : ''}">${r.tier === 'confirmed' ? 'Confirmed' : 'Apprentice'}</span>` : '';
+        const action = r
+            ? `<button type="button" class="link-btn" data-role-drop="${c.role}">Step down</button>`
+            : `<button type="button" class="btn btn-secondary btn-small" data-role-take="${c.role}">Take this role</button>`;
+        return `
+            <div class="role-card${r ? ' is-held' : ''}">
+                <div class="role-card-head">
+                    ${icon(c.icon)}
+                    <span class="role-card-name">${escapeHtml(c.name)}</span>
+                    ${tier}
+                </div>
+                ${body}
+                ${privacy}
+                <div class="role-card-actions">${action}</div>
+            </div>`;
+    }).join('');
+
+    container.querySelectorAll('[data-role-take]').forEach((btn) => {
+        btn.addEventListener('click', () => changeRole(btn.dataset.roleTake, 'POST'));
+    });
+    container.querySelectorAll('[data-role-drop]').forEach((btn) => {
+        btn.addEventListener('click', () => changeRole(btn.dataset.roleDrop, 'DELETE'));
+    });
+}
+
+async function changeRole(role, method) {
+    try {
+        const res = await fetch(
+            method === 'POST' ? `${API_BASE_URL}/me/roles` : `${API_BASE_URL}/me/roles/${encodeURIComponent(role)}`,
+            {
+                method,
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: method === 'POST' ? JSON.stringify({ role }) : undefined,
+            }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.error || 'Could not update your role.');
+            return;
+        }
+        showToast(method === 'POST'
+            ? 'Role taken. Your work will confirm you in it.'
+            : 'You stepped down. Your past work still counts if you come back.');
+        await Promise.all([loadMyRoles(), loadProfileData()]);
+    } catch (error) {
+        console.error('Role change error:', error);
+        showToast('Network error while updating your role.');
+    }
+}
+
+async function loadSourceQueue() {
+    const container = document.getElementById('sourceQueueContent');
+    if (!container) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/me/source-check-queue?limit=3`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load queue');
+        const items = (await res.json()).items || [];
+        if (!items.length) {
+            container.innerHTML = '<p class="empty-message">Nothing waiting for you right now. Thank you!</p>';
+            return;
+        }
+        container.innerHTML = items.map((it) => {
+            const hosts = (it.resources || []).map((r) => hostnameOf(r.url)).join(', ');
+            const checks = it.check_count
+                ? `${it.check_count} check${it.check_count === 1 ? '' : 's'} so far`
+                : 'No check yet';
+            return `
+                <a class="queue-item" href="argument.html?id=${encodeURIComponent(it.argument_id)}&check=${encodeURIComponent(it.counter_argument_id)}">
+                    <span class="queue-claim">“${escapeHtml(it.argument_text || '')}”</span>
+                    <span class="queue-text">${escapeHtml(it.text || '')}</span>
+                    <span class="queue-meta">${it.persona ? `For ${escapeHtml(it.persona)} · ` : ''}${icon('clip')} ${escapeHtml(hosts)} · ${checks}</span>
+                </a>`;
+        }).join('');
+    } catch (error) {
+        console.error('Source queue error:', error);
+        container.innerHTML = '<p class="empty-message">Could not load the queue.</p>';
+    }
+}
+
 // ---- Contribution status tracker ----
 const STATUS_META = {
-    pending:  { icon: '⏳', label: 'Pending review', cls: 'status-pending' },
-    approved: { icon: '✅', label: 'Approved',        cls: 'status-approved' },
-    rejected: { icon: '❌', label: 'Needs work',      cls: 'status-rejected' },
+    pending:  { icon: icon('hourglass'), label: 'Pending review', cls: 'status-pending' },
+    approved: { icon: icon('check'), label: 'Approved',        cls: 'status-approved' },
+    rejected: { icon: icon('x'), label: 'Needs work',      cls: 'status-rejected' },
 };
 
 async function loadContributionStatus() {
@@ -671,8 +855,8 @@ function renderContributionStatus(items, counts) {
     const rows = items.map((it) => {
         const meta = STATUS_META[it.status] || STATUS_META.pending;
         const kind = it.kind === 'source'
-            ? '<span class="tracker-kind">📚 Source</span>'
-            : '<span class="tracker-kind">💬 Response</span>';
+            ? `<span class="tracker-kind">${icon('book')} Source</span>`
+            : `<span class="tracker-kind">${icon('message')} Response</span>`;
         const when = it.submitted_at
             ? `<time datetime="${escapeHtml(it.submitted_at)}">${new Date(it.submitted_at).toLocaleDateString()}</time>`
             : '—';
@@ -765,17 +949,17 @@ function renderRecommendations(args, followedTags) {
         const count = a.counter_argument_count || 0;
         const why = `Because you follow ${matched.slice(0, 2).map((t) => `#${escapeHtml(t)}`).join(' ')}`;
         const urgencyNote = count === 0
-            ? '<span class="needs-badge needs-badge-hot">⚡ No response yet</span>'
+            ? `<span class="needs-badge needs-badge-hot">${icon('zap')} No response yet</span>`
             : `<span class="needs-badge">${count} response${count === 1 ? '' : 's'}</span>`;
 
         const card = document.createElement('a');
         card.className = 'needs-card';
         card.href = `argument.html?id=${encodeURIComponent(a.id)}`;
         card.innerHTML = `
-            <p class="rec-why">🎯 ${why}</p>
+            <p class="rec-why">${icon('target')} ${why}</p>
             <p class="needs-quote">"${formatClaimText(a.text)}"</p>
             <div class="needs-meta">${urgencyNote}</div>
-            <span class="needs-cta">${count === 0 ? '✍️ Be the first to respond →' : '💬 Add your response →'}</span>`;
+            <span class="needs-cta">${count === 0 ? `${icon('pen')} Be the first to respond →` : `${icon('message')} Add your response →`}</span>`;
         container.appendChild(card);
     });
 }
@@ -808,7 +992,7 @@ async function loadFollowingActivity() {
     }
 }
 
-const ACTIVITY_ICON = { response: '💬', source: '📚' };
+const ACTIVITY_ICON = { response: icon('message'), source: icon('book') };
 
 function renderFollowingActivity(items) {
     const container = document.getElementById('followingActivityContent');
@@ -822,7 +1006,7 @@ function renderFollowingActivity(items) {
     }
 
     container.innerHTML = items.map((it) => {
-        const icon = ACTIVITY_ICON[it.kind] || '•';
+        const kindIcon = ACTIVITY_ICON[it.kind] || '•';
         const who = `<a href="profile.html?id=${encodeURIComponent(it.user.id)}" class="activity-user">${escapeHtml(it.user.username)}</a>`;
         const what = it.href
             ? `<a href="${escapeHtml(it.href)}"${it.kind === 'source' ? ' target="_blank" rel="noopener noreferrer"' : ''}>"${escapeHtml(it.title)}"</a>`
@@ -830,7 +1014,7 @@ function renderFollowingActivity(items) {
         const when = it.at ? `<time datetime="${escapeHtml(it.at)}" class="activity-time">${escapeHtml(timeAgo(it.at))}</time>` : '';
         return `
             <div class="activity-item">
-                <span class="activity-icon" aria-hidden="true">${icon}</span>
+                <span class="activity-icon" aria-hidden="true">${kindIcon}</span>
                 <p class="activity-text">${who} ${escapeHtml(it.verb)} ${what}</p>
                 ${when}
             </div>`;
@@ -867,6 +1051,7 @@ async function loadProfileData() {
 
         // Level bar (own profile only — the container is hidden otherwise).
         if (isOwnProfile) renderLevelBar(data.user.reputation_score);
+        renderRoleChips(data.roles || []);
         
         // Update follow button state
         isFollowingProfile = data.is_following;
@@ -1049,7 +1234,7 @@ function displayProfileContributions(contributions) {
     
     if (contributions.length === 0) {
         const message = isOwnProfile 
-            ? 'No contributions yet. <a href="contribute.html">Submit your first counter-narrative!</a>'
+            ? 'No contributions yet. <a href="contribute.html">Write your first response!</a>'
             : 'No contributions yet.';
         container.innerHTML = `<p class="empty-message">${message}</p>`;
         return;
@@ -1298,28 +1483,28 @@ async function unfollowUser(userId) {
 const REPO_URL = 'https://github.com/LucieRC/re.inform';
 
 const CONTRIBUTOR_PROFILES = [
-    { id: 'quick', short: 'A few minutes', icon: '⏱️', title: 'I have a few minutes', who: 'Anyone — no expertise needed', tasks: ['prioritize', 'rate', 'claim'] },
-    { id: 'talk', short: 'I talk with people', icon: '🗣️', title: 'I discuss these topics with people around me', who: 'Family, friends, colleagues, online', tasks: ['claim', 'answer', 'personas'] },
-    { id: 'science', short: 'Science & sources', icon: '🔬', title: "I'm comfortable with science and sources", who: 'Researcher, student, fact-checker', tasks: ['review', 'resource', 'answer'] },
-    { id: 'write', short: 'Writing & teaching', icon: '✍️', title: 'I write, teach or communicate', who: 'Journalist, teacher, activist', tasks: ['answer', 'improve', 'personas'] },
-    { id: 'visual', short: 'Design', icon: '🎨', title: 'I design or illustrate', who: 'Graphic designer, illustrator', tasks: ['visual', 'personas'] },
-    { id: 'tech', short: 'Code & data', icon: '🛠️', title: 'I code or work with data', who: 'Developer, data scientist', tasks: ['code', 'data'] },
+    { id: 'quick', icon: 'clock', title: 'I have a few minutes', who: 'Anyone — no expertise needed', tasks: ['prioritize', 'rate', 'claim'] },
+    { id: 'talk', icon: 'message', title: 'I discuss these topics with people around me', who: 'Family, friends, colleagues, online', tasks: ['claim', 'answer', 'personas'] },
+    { id: 'science', icon: 'flask', title: "I'm comfortable with science and sources", who: 'Researcher, student, fact-checker', tasks: ['review', 'resource', 'answer'] },
+    { id: 'write', icon: 'pen', title: 'I write, teach or communicate', who: 'Journalist, teacher, activist', tasks: ['answer', 'improve', 'personas'] },
+    { id: 'visual', icon: 'palette', title: 'I design or illustrate', who: 'Graphic designer, illustrator', tasks: ['visual', 'personas'] },
+    { id: 'tech', icon: 'code', title: 'I code or work with data', who: 'Developer, data scientist', tasks: ['code', 'data'] },
 ];
 
 // `open` reveals a workspace on this page; `href` (or `hrefFrom`, computed once
 // claims are loaded) leads to where the work happens.
 const CONTRIBUTOR_TASKS = {
-    prioritize: { icon: '🎯', title: 'Vote on the claims you hear most', desc: 'One tap per claim. It decides what gets answered first.', time: '1 min', account: true, open: 'ws-prioritize' },
-    rate: { icon: '⭐', title: 'Rate an answer', desc: 'Read a response and say whether it would convince the person it targets.', time: '30 sec', account: true, hrefFrom: 'unrated' },
-    claim: { icon: '➕', title: "Add a claim you've heard", desc: 'Just the sentence. No source or answer needed.', time: '1 min', account: true, open: 'ws-claim' },
-    answer: { icon: '💬', title: 'Answer a claim for a specific person', desc: 'Pick a claim and a persona that has no answer yet. A few sentences are enough.', time: '5 min', account: true, open: 'ws-answer' },
-    personas: { icon: '🎭', title: 'Get to know the personas', desc: 'Five kinds of people you may talk to, and what moves each of them.', time: '5 min', account: false, href: 'personalities.html' },
-    review: { icon: '🔎', title: 'Fact-check the answers to a claim', desc: 'Check the sources, rate the answers, and propose a corrected version if something is off.', time: '10 min', account: true, hrefFrom: 'review' },
-    resource: { icon: '📚', title: 'Share a study, article or report', desc: 'Add evidence to the shared library so anyone can cite it.', time: '2 min', account: true, open: 'ws-resource' },
-    improve: { icon: '🪄', title: 'Make an existing answer more convincing', desc: 'Open a claim and use “Propose an improved response” on an answer that sounds too dry or too preachy.', time: '10 min', account: true, hrefFrom: 'review' },
-    visual: { icon: '🖼️', title: 'Turn an answer into a visual', desc: 'Infographics travel further than text. Make one, then share its link in the library.', time: '1 h+', account: true, open: 'ws-resource' },
-    code: { icon: '💻', title: 'Improve the website', desc: 'Flask + plain JavaScript. Pick an open issue or propose your own on GitHub.', time: 'Flexible', account: false, href: `${REPO_URL}/issues`, external: true },
-    data: { icon: '📊', title: 'Work on the persona research', desc: 'Personas are built from European Values Study survey data with a Python pipeline. Help refine the method.', time: 'Flexible', account: false, href: REPO_URL, external: true },
+    prioritize: { icon: 'target', title: 'Vote on the claims you hear most', desc: 'One tap per claim. It decides what gets answered first.', time: '1 min', account: true, open: 'ws-prioritize' },
+    rate: { icon: 'star', title: 'Rate an answer', desc: 'Read a response and say whether it would convince the person it targets.', time: '30 sec', account: true, hrefFrom: 'unrated' },
+    claim: { icon: 'plus', title: "Add a claim you've heard", desc: 'Just the sentence. No source or answer needed.', time: '1 min', account: true, open: 'ws-claim' },
+    answer: { icon: 'message', title: 'Answer a claim for a specific person', desc: 'Pick a claim and a persona that has no answer yet. A few sentences are enough.', time: '5 min', account: true, open: 'ws-answer' },
+    personas: { icon: 'users', title: 'Get to know the personas', desc: 'Five kinds of people you may talk to, and what moves each of them.', time: '5 min', account: false, href: 'personalities.html' },
+    review: { icon: 'search', title: 'Fact-check the answers to a claim', desc: 'Check the sources, rate the answers, and propose a corrected version if something is off.', time: '10 min', account: true, hrefFrom: 'review' },
+    resource: { icon: 'book', title: 'Share a study, article or report', desc: 'Add evidence to the shared library so anyone can cite it.', time: '2 min', account: true, open: 'ws-resource' },
+    improve: { icon: 'pen', title: 'Make an existing answer more convincing', desc: 'Open a claim and use “Propose an improved response” on an answer that sounds too dry or too preachy.', time: '10 min', account: true, hrefFrom: 'review' },
+    visual: { icon: 'image', title: 'Turn an answer into a visual', desc: 'Infographics travel further than text. Make one, then share its link in the library.', time: '1 h+', account: true, open: 'ws-resource' },
+    code: { icon: 'code', title: 'Improve the website', desc: 'Flask + plain JavaScript. Pick an open issue or propose your own on GitHub.', time: 'Flexible', account: false, href: `${REPO_URL}/issues`, external: true },
+    data: { icon: 'chart', title: 'Work on the persona research', desc: 'Personas are built from European Values Study survey data with a Python pipeline. Help refine the method.', time: 'Flexible', account: false, href: REPO_URL, external: true },
 };
 
 const PROFILE_STORAGE_KEY = 'reinform.contributorProfile';
@@ -1334,7 +1519,7 @@ function initContributePage() {
 
     picker.innerHTML = CONTRIBUTOR_PROFILES.map((p) => `
         <button type="button" class="onb-profile" data-profile="${p.id}" aria-pressed="false">
-            <span class="onb-profile-icon" aria-hidden="true">${p.icon}</span>
+            <span class="onb-profile-icon">${icon(p.icon)}</span>
             <span class="onb-profile-title">${escapeHtml(p.title)}</span>
             <span class="onb-profile-who">${escapeHtml(p.who)}</span>
         </button>
@@ -1358,17 +1543,6 @@ function initContributePage() {
     }
     const taskId = params.get('task');
     if (CONTRIBUTOR_TASKS[taskId]?.open) openContributorTask(taskId);
-}
-
-// Home page: one chip per profile, straight into its tasks.
-function renderHelpProfiles() {
-    const el = document.getElementById('helpProfiles');
-    if (!el) return;
-    el.innerHTML = CONTRIBUTOR_PROFILES.map((p) => `
-        <a class="onb-chip" href="contribute.html?as=${p.id}" title="${escapeHtml(p.title)}">
-            <span aria-hidden="true">${p.icon}</span>${escapeHtml(p.short)}
-        </a>
-    `).join('');
 }
 
 function selectContributorProfile(profileId, { scroll = false } = {}) {
@@ -1409,7 +1583,7 @@ function createTaskCard(taskId, isFirst) {
     }
     const accountTag = t.account && !currentUser ? ' · free account' : '';
     el.innerHTML = `
-        <span class="help-path-icon" aria-hidden="true">${t.icon}</span>
+        <span class="help-path-icon">${icon(t.icon)}</span>
         <span class="help-path-body">
             <span class="help-path-title">${escapeHtml(t.title)}</span>
             <span class="help-path-desc">${escapeHtml(t.desc)}</span>
@@ -1519,15 +1693,65 @@ function renderAnswerGaps() {
             <p class="needs-quote">"${formatClaimText(a.text)}"</p>
             <div class="onb-gap-links">
                 ${missing.slice(0, 3).map((p) => `
-                    <a class="gap-chip" href="argument.html?id=${encodeURIComponent(a.id)}&amp;write=${encodeURIComponent(p.id)}">✍️ For ${escapeHtml(p.name)}</a>
+                    <a class="gap-chip" href="argument.html?id=${encodeURIComponent(a.id)}&amp;write=${encodeURIComponent(p.id)}">${icon('pen')} For ${escapeHtml(p.name)}</a>
                 `).join('')}
             </div>
         </div>
     `).join('') + '<p class="onb-more"><a href="index.html">See all claims →</a></p>';
 }
 
-function setupClaimForm() {
-    const form = document.getElementById('claimForm');
+// Home feed: the "Heard a claim…" prompt opens the claim form in place.
+function setupFeedComposer() {
+    const toggle = document.getElementById('feedComposerToggle');
+    const form = document.getElementById('feedComposer');
+    if (!toggle || !form) return;
+    const messageEl = document.getElementById('claimFormMessage');
+
+    const open = () => {
+        toggle.hidden = true;
+        toggle.setAttribute('aria-expanded', 'true');
+        form.hidden = false;
+        // Logged out: say so up front rather than after they've typed.
+        if (!currentUser && !messageEl.textContent) {
+            messageEl.innerHTML = `You'll need a free account to post. <a href="${authHref('register.html')}">Create one</a> or <a href="${authHref('login.html')}">log in</a> — you'll come back right here.`;
+            messageEl.className = 'form-message';
+        }
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        document.getElementById('claimText').focus({ preventScroll: true });
+    };
+    const close = ({ refocus = true } = {}) => {
+        form.hidden = true;
+        toggle.hidden = false;
+        toggle.setAttribute('aria-expanded', 'false');
+        // A "posted" confirmation shouldn't greet them the next time they open it.
+        if (messageEl.classList.contains('success')) {
+            messageEl.textContent = '';
+            messageEl.className = 'form-message';
+        }
+        if (refocus) toggle.focus();
+    };
+
+    // Leaving the form (click or Tab elsewhere): keep it open if they've started
+    // writing so the draft stays visible; otherwise fold back to the prompt.
+    const textArea = document.getElementById('claimText');
+    const collapseIfEmpty = (target) => {
+        if (form.hidden || form.contains(target) || toggle.contains(target)) return;
+        if (textArea.value.trim()) return;
+        close({ refocus: false });
+    };
+    document.addEventListener('pointerdown', (e) => collapseIfEmpty(e.target));
+    form.addEventListener('focusout', (e) => {
+        if (e.relatedTarget) collapseIfEmpty(e.relatedTarget);
+    });
+
+    toggle.addEventListener('click', open);
+    document.getElementById('feedComposerCancel').addEventListener('click', () => close());
+    document.querySelectorAll('[data-open-composer]').forEach((b) => b.addEventListener('click', open));
+    setupClaimForm('feedComposer');
+}
+
+function setupClaimForm(formId = 'claimForm') {
+    const form = document.getElementById(formId);
     if (!form) return;
     const messageEl = document.getElementById('claimFormMessage');
     const submitBtn = document.getElementById('claimSubmitBtn');
@@ -1805,7 +2029,7 @@ function createContributionCard(contribution) {
         detailsParts.push(`<div class="contribution-detail"><strong>Quote:</strong> ${escapeHtml(narrativeText)}</div>`);
     }
     if (counterArgumentText && quoteText !== counterArgumentText) {
-        detailsParts.push(`<div class="contribution-detail"><strong>Counter-narrative:</strong> ${escapeHtml(counterArgumentText)}</div>`);
+        detailsParts.push(`<div class="contribution-detail"><strong>Response:</strong> ${escapeHtml(counterArgumentText)}</div>`);
     }
     if (contribution.title) {
         detailsParts.push(`<div class="contribution-detail"><strong>Title:</strong> ${escapeHtml(contribution.title)}</div>`);
@@ -2061,7 +2285,7 @@ function createArchetypeCard(p) {
             ${format ? `<span class="format-tag">${format}</span>` : ''}
         </div>
 
-        ${teaser ? `<p class="approach-teaser"><strong>💡 How to reach them:</strong> ${escapeHtml(teaser)}</p>` : ''}
+        ${teaser ? `<p class="approach-teaser"><strong>${icon('bulb')} How to reach them:</strong> ${escapeHtml(teaser)}</p>` : ''}
 
         <span class="archetype-cta">View full profile →</span>
     `;
@@ -2159,16 +2383,16 @@ function personaClaimsSection(persona, args) {
         const badge = (count && typeof avg === 'number')
             ? (() => {
                 const level = importanceLevel(avg);
-                return `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${count} rating${count === 1 ? '' : 's'}">🎯 ${level.label} · ${avg.toFixed(1)}/5</span>`;
+                return `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${count} rating${count === 1 ? '' : 's'}">${icon('target')} ${level.label} · ${avg.toFixed(1)}/5</span>`;
             })()
-            : '<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">🎯 Importance unrated</span>';
+            : `<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">${icon('target')} Importance unrated</span>`;
 
         const contributions = a.contribution_count || 0;
         return `
             <a class="needs-card" href="argument.html?id=${encodeURIComponent(a.id)}">
                 <p class="needs-quote">"${formatClaimText(a.text)}"</p>
                 <div class="needs-meta">
-                    <span class="needs-badge" title="Debunks, ratings and resources combined">🧩 ${contributions} contribution${contributions === 1 ? '' : 's'}</span>
+                    <span class="needs-badge" title="Debunks, ratings and resources combined">${icon('layers')} ${contributions} contribution${contributions === 1 ? '' : 's'}</span>
                     ${badge}
                 </div>
             </a>`;
@@ -2242,12 +2466,12 @@ function renderPersonaProfile(p, container, personaArgs = []) {
 
             ${approach ? `
             <section class="persona-section persuasion-panel">
-                <h3>💡 How to change their mind${format ? ` <span class="format-tag">${format}</span>` : ''}</h3>
+                <h3>${icon('bulb')} How to change their mind${format ? ` <span class="format-tag">${format}</span>` : ''}</h3>
                 <p class="approach">${approach}</p>
                 ${(doList.length || dontList.length) ? `
                 <div class="do-dont">
-                    ${doList.length ? `<div class="do-col"><span class="do-label">✅ Do</span><ul>${listHtml(doList)}</ul></div>` : ''}
-                    ${dontList.length ? `<div class="dont-col"><span class="dont-label">🚫 Avoid</span><ul>${listHtml(dontList)}</ul></div>` : ''}
+                    ${doList.length ? `<div class="do-col"><span class="do-label">${icon('check')} Do</span><ul>${listHtml(doList)}</ul></div>` : ''}
+                    ${dontList.length ? `<div class="dont-col"><span class="dont-label">${icon('ban')} Avoid</span><ul>${listHtml(dontList)}</ul></div>` : ''}
                 </div>` : ''}
                 ${messengers.length ? `<div class="messengers-row"><span class="field-label">Who to bring</span>${chipHtml(messengers)}</div>` : ''}
             </section>` : ''}
@@ -2384,7 +2608,7 @@ function createFilterBar(mount, spec) {
     const emit = () => { if (typeof spec.onChange === 'function') spec.onChange(getState()); };
     const optionLabel = (facet, value) => {
         const opt = facet.options.find((o) => String(o.value) === String(value));
-        return opt ? opt.label : value;
+        return opt ? personaEmojiHtml(opt.emoji) + escapeHtml(opt.label) : escapeHtml(String(value));
     };
     const anyActive = () => facets.some((f) => f.selected.size) || !!searchValue.trim();
 
@@ -2441,7 +2665,7 @@ function createFilterBar(mount, spec) {
         facet._menu.innerHTML = '<div class="filterbar-options">' + facet.options.map((o) => {
             const checked = facet.selected.has(String(o.value)) ? 'checked' : '';
             const c = (typeof o.count === 'number') ? `<span class="filterbar-opt-count">${o.count}</span>` : '';
-            return `<label class="filterbar-option"><input type="checkbox" value="${escapeHtml(String(o.value))}" ${checked}><span>${escapeHtml(o.label)}</span>${c}</label>`;
+            return `<label class="filterbar-option"><input type="checkbox" value="${escapeHtml(String(o.value))}" ${checked}><span>${personaEmojiHtml(o.emoji)}${escapeHtml(o.label)}</span>${c}</label>`;
         }).join('') + '</div>';
 
         facet._menu.querySelectorAll('input[type="checkbox"]').forEach((box) => {
@@ -2460,7 +2684,7 @@ function createFilterBar(mount, spec) {
         const pills = [];
         facets.forEach((facet) => {
             facet.selected.forEach((v) => {
-                pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-value="${escapeHtml(String(v))}">${escapeHtml(facet.label)}: ${escapeHtml(optionLabel(facet, v))} ✕</button>`);
+                pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-value="${escapeHtml(String(v))}">${escapeHtml(facet.label)}: ${optionLabel(facet, v)} ✕</button>`);
             });
         });
         if (!pills.length && !searchValue.trim()) { chipsEl.innerHTML = ''; return; }
@@ -2547,6 +2771,13 @@ function createFilterBar(mount, spec) {
 
 let allArguments = [];
 let feedSort = 'responses';
+// "Named" personas are the conversational caricatures. The numbered EVS clusters
+// ("01"…"10") are analysis placeholders and must never be offered in the UI.
+function isNamedPersona(p) {
+    const name = String(p?.name || '').trim();
+    return Boolean(name) && !/^\d+$/.test(name);
+}
+
 let feedQuery = '';
 let feedTopics = new Set();
 // Persona filter: a set of ids, so several personalities can be combined.
@@ -2602,13 +2833,13 @@ async function initRespondPage() {
         // with no claims would only ever empty the feed.
         const personasWithClaims = new Set(allArguments.flatMap((a) => (a.personas || []).map((x) => x && x.id)));
         const personaOptions = feedPersonaList
-            .filter((p) => personasWithClaims.has(p.id))
-            .map((p) => ({ value: String(p.id), label: personaLabel(p) }));
+            .filter((p) => personasWithClaims.has(p.id) && isNamedPersona(p))
+            .map((p) => ({ value: String(p.id), label: p.name || 'Unknown', emoji: p.emoji }));
 
         createFilterBar(document.getElementById('feedControls'), {
             facets: [
-                { id: 'persona', label: 'Personality', icon: '🎭', options: personaOptions, selected: [...feedPersonaIds].map(String) },
-                { id: 'topic', label: 'Topic', icon: '🏷', options: topicOptions },
+                { id: 'persona', label: 'Personality', icon: icon('users'), options: personaOptions, selected: [...feedPersonaIds].map(String) },
+                { id: 'topic', label: 'Topic', icon: icon('tag'), options: topicOptions },
             ],
             sort: {
                 label: 'Sort', value: feedSort, options: [
@@ -2682,9 +2913,9 @@ function importanceLevel(avgScore) {
     return { label: 'Low', className: 'feed-importance-low' };
 }
 
-function personaLabel(persona) {
-    const emoji = persona?.emoji ? `${persona.emoji} ` : '';
-    return `${emoji}${persona?.name || 'Unknown'}`;
+// Persona emoji, drawn as black line art by the Noto Emoji font (see .persona-emoji in styles.css).
+function personaEmojiHtml(emoji) {
+    return emoji ? `<span class="persona-emoji" aria-hidden="true">${escapeHtml(emoji)}</span> ` : '';
 }
 
 // Keep ?persona=… in sync with the current selection so the feed is shareable
@@ -2711,7 +2942,7 @@ function createFeedCard(a) {
     const personaChips = personas.slice(0, 3).map((p) => {
         const parts = (p.name || '').trim().split(/\s+/);
         const family = escapeHtml(parts.length > 1 ? parts.slice(1).join(' ') : (parts[0] || 'Profile'));
-        const em = p.emoji ? escapeHtml(p.emoji) + ' ' : '';
+        const em = personaEmojiHtml(p.emoji);
         return `<span class="feed-persona-mini" title="${escapeHtml(p.name || '')}">${em}${family}</span>`;
     }).join('');
     const moreChip = personas.length > 3 ? `<span class="feed-persona-more">+${personas.length - 3}</span>` : '';
@@ -2720,8 +2951,8 @@ function createFeedCard(a) {
         : '';
 
     const badge = count === 0
-        ? '<span class="needs-badge needs-badge-hot">⚡ No response yet</span>'
-        : `<span class="needs-badge" title="Debunks, ratings and resources combined">🧩 ${contributions} contribution${contributions === 1 ? '' : 's'}</span>`;
+        ? `<span class="needs-badge needs-badge-hot">${icon('zap')} No response yet</span>`
+        : `<span class="needs-badge" title="Debunks, ratings and resources combined">${icon('layers')} ${contributions} contribution${contributions === 1 ? '' : 's'}</span>`;
 
     // How urgent the community says this is to debunk — from the importance
     // ratings cast on the contribute page.
@@ -2731,9 +2962,9 @@ function createFeedCard(a) {
     let importanceHtml;
     if (ratingCount && typeof avg === 'number') {
         const level = importanceLevel(avg);
-        importanceHtml = `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${ratingCount} rating${ratingCount === 1 ? '' : 's'}">🎯 ${level.label} · ${avg.toFixed(1)}/5</span>`;
+        importanceHtml = `<span class="needs-badge feed-importance ${level.className}" title="Importance: ${avg.toFixed(1)}/5 from ${ratingCount} rating${ratingCount === 1 ? '' : 's'}">${icon('target')} ${level.label} · ${avg.toFixed(1)}/5</span>`;
     } else {
-        importanceHtml = '<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">🎯 Importance unrated</span>';
+        importanceHtml = `<span class="needs-badge feed-importance feed-importance-unrated" title="Nobody has rated how urgent this is yet">${icon('target')} Importance unrated</span>`;
     }
 
     const card = document.createElement('a');
@@ -2772,7 +3003,7 @@ async function initArgumentDetailPage() {
     if (!Number.isInteger(id)) {
         if (loading) loading.style.display = 'none';
         if (errorEl) {
-            errorEl.textContent = 'No narrative selected.';
+            errorEl.textContent = 'No claim selected.';
             errorEl.style.display = 'block';
         }
         return;
@@ -2781,7 +3012,8 @@ async function initArgumentDetailPage() {
 
     try {
         const [argRes, personaRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/arguments/${id}`),
+            // Credentials so the API can say whether this viewer may check sources.
+            fetch(`${API_BASE_URL}/arguments/${id}`, { credentials: 'include' }),
             fetch(`${API_BASE_URL}/persona-archetypes`),
         ]);
         if (!argRes.ok) throw new Error('Failed to load narrative');
@@ -2792,11 +3024,7 @@ async function initArgumentDetailPage() {
 
         const personas = personaRes.ok ? await personaRes.json() : [];
         argDetailState.personas = Array.isArray(personas) ? personas : [];
-        // "Named" personas are the conversational caricatures (not the numbered EVS clusters).
-        argDetailState.namedPersonas = argDetailState.personas.filter((p) => {
-            const name = String(p?.name || '').trim();
-            return name && !/^\d+$/.test(name);
-        });
+        argDetailState.namedPersonas = argDetailState.personas.filter(isNamedPersona);
 
         if (loading) loading.style.display = 'none';
         if (detail) detail.style.display = 'block';
@@ -2807,11 +3035,20 @@ async function initArgumentDetailPage() {
         // Deep link from the Contribute page: ?write=<personaId> (or ?write=any) opens the composer.
         const write = params.get('write');
         if (write) openComposer(id, /^\d+$/.test(write) ? Number(write) : '');
+
+        // Deep link from the Sourcer queue: ?check=<debunkId> opens its check row.
+        const checkId = params.get('check');
+        const checkCa = argDetailState.counterArguments.find((c) => String(c.id) === checkId);
+        const checkCard = checkCa && document.querySelector(`.response-card[data-ca-id="${checkCa.id}"]`);
+        if (checkCard && checkCa.source_check?.can_check) {
+            toggleCheckRow(checkCard, checkCa);
+            checkCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     } catch (error) {
         console.error('Error loading narrative:', error);
         if (loading) loading.style.display = 'none';
         if (errorEl) {
-            errorEl.textContent = 'Failed to load this narrative. Please try again later.';
+            errorEl.textContent = 'Failed to load this claim. Please try again later.';
             errorEl.style.display = 'block';
         }
     }
@@ -2821,8 +3058,8 @@ function renderArgumentDetail() {
     const arg = argDetailState.argument || {};
     const cas = argDetailState.counterArguments;
 
-    document.getElementById('narrativeText').textContent = arg.text || 'Narrative';
-    document.title = `${(arg.text || 'Narrative').slice(0, 50)} - re.inform`;
+    document.getElementById('narrativeText').textContent = arg.text || 'Claim';
+    document.title = `${(arg.text || 'Claim').slice(0, 50)} - re.inform`;
 
     const tagsEl = document.getElementById('narrativeTags');
     tagsEl.innerHTML = (arg.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
@@ -2831,7 +3068,7 @@ function renderArgumentDetail() {
     const seenPersonas = new Map();
     cas.forEach((ca) => {
         const p = ca.persona_archetype;
-        if (p && p.id != null) seenPersonas.set(p.id, p);
+        if (p && p.id != null && isNamedPersona(p)) seenPersonas.set(p.id, p);
     });
     const seenWith = document.getElementById('seenWith');
     if (seenPersonas.size) {
@@ -2902,12 +3139,18 @@ function createResponseCard(ca) {
         : (ca.source_url ? [{ url: ca.source_url, title: null }] : []);
     const sourceHtml = resources.length
         ? resources.map((r) =>
-            `<a class="trust-item source-chip" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">📎 ${escapeHtml(r.title || hostnameOf(r.url))}</a>`
+            `<a class="trust-item source-chip" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${icon('clip')} ${escapeHtml(r.title || hostnameOf(r.url))}</a>`
           ).join('')
         : `<span class="trust-item trust-muted">No source</span>`;
 
+    const check = ca.source_check || {};
+    const checkBtnHtml = check.can_check
+        ? `<button type="button" class="btn btn-secondary btn-small response-check">${icon('search')} ${check.my_verdict ? 'Change your check' : 'Check source'}</button>`
+        : '';
+
     const card = document.createElement('div');
     card.className = 'response-card';
+    card.dataset.caId = ca.id;
     card.dataset.text = text;
     card.dataset.source = ca.source_url || '';
     card.innerHTML = `
@@ -2917,14 +3160,19 @@ function createResponseCard(ca) {
         </div>
         <p class="response-text">${escapeHtml(shownText)}</p>
         ${isLong ? `<button type="button" class="link-btn response-more">Read more</button>` : ''}
-        <div class="response-trust">${sourceHtml}${ratingHtml}</div>
+        <div class="response-trust">${sourceHtml}${sourceStampHtml(check)}${ratingHtml}</div>
         <div class="response-actions">
-            <button type="button" class="btn btn-secondary btn-small response-copy">📋 Copy</button>
+            <button type="button" class="btn btn-secondary btn-small response-copy">${icon('copy')} Copy</button>
             <button type="button" class="btn btn-secondary btn-small response-rate">★ Rate</button>
-            <button type="button" class="btn btn-secondary btn-small response-improve">✍️ Improve</button>
+            <button type="button" class="btn btn-secondary btn-small response-improve">${icon('pen')} Improve</button>
+            ${checkBtnHtml}
         </div>
         <div class="rate-row" style="display: none;" aria-hidden="true"></div>
+        <div class="check-row" hidden></div>
     `;
+
+    // Check source → inline verdict row (Sourcers and moderators only)
+    card.querySelector('.response-check')?.addEventListener('click', () => toggleCheckRow(card, ca));
 
     // Read more / less
     if (isLong) {
@@ -2943,7 +3191,7 @@ function createResponseCard(ca) {
         const urls = resources.map((r) => r.url).filter(Boolean);
         const toCopy = urls.length ? `${text}\n\nSources:\n${urls.join('\n')}` : text;
         navigator.clipboard.writeText(toCopy).then(() => {
-            showToast('Copied! Tell us if it worked in a real conversation 🧪');
+            showToast('Copied! Tell us if it worked in a real conversation.');
         }).catch(() => {
             showToast('Could not copy automatically — select and copy the text.');
         });
@@ -2967,6 +3215,100 @@ function createResponseCard(ca) {
     });
 
     return card;
+}
+
+// ---- Source-verified stamp (see backend/roles.py) ----
+
+const SOURCE_STAMPS = {
+    verified: { icon: 'check', label: 'Source verified', cls: 'stamp-verified',
+        title: 'Sourcers checked that the cited sources support this response.' },
+    needs_work: { icon: 'x', label: 'Source needs work', cls: 'stamp-needs-work',
+        title: 'Sourcers found the cited sources don’t fully support this response.' },
+    pending: { icon: 'hourglass', label: 'Source not verified yet', cls: 'stamp-pending',
+        title: 'No Sourcer has confirmed these sources yet.' },
+};
+
+const SOURCE_VERDICTS = [
+    { value: 'supports', label: 'Yes, they back it up' },
+    { value: 'partial', label: 'Only partly' },
+    { value: 'does_not_support', label: 'No' },
+    { value: 'broken', label: 'Link broken' },
+];
+
+function sourceStampHtml(check) {
+    const stamp = SOURCE_STAMPS[check.status];
+    if (!stamp) return '';
+    const label = check.status === 'pending' && check.count
+        ? `Source check in progress (${check.count})`
+        : stamp.label;
+    return `<span class="trust-item source-stamp ${stamp.cls}" title="${escapeHtml(stamp.title)}">${icon(stamp.icon)} ${escapeHtml(label)}</span>`;
+}
+
+function toggleCheckRow(card, ca) {
+    const row = card.querySelector('.check-row');
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (row.hidden || row.dataset.built) return;
+    row.dataset.built = '1';
+
+    const mine = ca.source_check?.my_verdict || null;
+    row.innerHTML = `
+        <span class="rate-label">Open the sources above. Do they back up this response?</span>
+        <div class="check-verdicts" role="group" aria-label="Your verdict">
+            ${SOURCE_VERDICTS.map((v) => `
+                <button type="button" class="btn btn-secondary btn-small check-verdict" data-verdict="${v.value}"
+                        aria-pressed="${v.value === mine}">${escapeHtml(v.label)}</button>`).join('')}
+        </div>
+        <input type="text" class="check-note" maxlength="500" aria-label="Note for the author (optional)"
+               placeholder="Optional: what’s missing or wrong?">
+        <div class="check-submit-row">
+            <button type="button" class="btn btn-primary btn-small check-submit" ${mine ? '' : 'disabled'}>Submit check</button>
+            <span class="check-hint">Your check counts toward the stamp. Points come once the verdict is settled.</span>
+        </div>
+    `;
+
+    let verdict = mine;
+    row.querySelectorAll('.check-verdict').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            verdict = btn.dataset.verdict;
+            row.querySelectorAll('.check-verdict').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+            row.querySelector('.check-submit').disabled = false;
+        });
+    });
+    row.querySelector('.check-submit').addEventListener('click', () => {
+        submitSourceCheck(ca.id, verdict, row.querySelector('.check-note').value.trim(), row);
+    });
+}
+
+async function submitSourceCheck(counterArgumentId, verdict, note, row) {
+    if (!verdict) return;
+    const btn = row.querySelector('.check-submit');
+    btn.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE_URL}/counter-arguments/${counterArgumentId}/source-checks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ verdict, note }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || 'Could not save your check.');
+            btn.disabled = false;
+            return;
+        }
+        const status = data.source_check?.status;
+        const points = data.points_earned ? ` +${data.points_earned} reputation.` : '';
+        const msg = status === 'verified' ? `Source verified.${points}`
+            : status === 'needs_work' ? `Flagged: sources need work.${points}`
+            : 'Check saved. One more settles it.';
+        showToast(msg);
+        await reloadArgumentDetail();
+    } catch (error) {
+        console.error('Source check error:', error);
+        showToast('Network error while saving your check.');
+        btn.disabled = false;
+    }
 }
 
 function buildRateRow(rateRow, counterArgumentId, personaId) {
@@ -3011,7 +3353,7 @@ async function submitRating(counterArgumentId, personaId, score, rateRow) {
         const data = await res.json();
         if (res.ok) {
             rateRow.innerHTML = `<span class="rate-thanks">Thanks — rated ${score}★</span>`;
-            showToast('Rating saved. Have you tried this one for real? 🧪');
+            showToast('Rating saved. Have you tried this one for real?');
         } else {
             showToast(data.error || 'Could not save rating.');
         }
@@ -3058,7 +3400,7 @@ function renderGaps() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'gap-chip';
-        btn.textContent = `✍️ Write for ${p.name}`;
+        btn.innerHTML = `${icon('pen')} Write for ${escapeHtml(p.name)}`;
         btn.addEventListener('click', () => openComposer(argDetailState.argumentId, p.id));
         gapsList.appendChild(btn);
     });
@@ -3209,7 +3551,7 @@ async function submitComposer(e) {
 
 async function reloadArgumentDetail() {
     try {
-        const res = await fetch(`${API_BASE_URL}/arguments/${argDetailState.argumentId}`);
+        const res = await fetch(`${API_BASE_URL}/arguments/${argDetailState.argumentId}`, { credentials: 'include' });
         if (!res.ok) return;
         const data = await res.json();
         argDetailState.argument = data.argument || {};
@@ -3244,7 +3586,7 @@ async function initBlogArticlesPage() {
         blogState.topics = new Set(seed);
 
         createFilterBar(document.getElementById('blogControls'), {
-            facets: [{ id: 'topic', label: 'Topic', icon: '🏷', options: topicOptions, selected: seed }],
+            facets: [{ id: 'topic', label: 'Topic', icon: icon('tag'), options: topicOptions, selected: seed }],
             sort: {
                 label: 'Sort', value: blogState.sort, options: [
                     { value: 'rating', label: 'Effectiveness' },
@@ -3782,14 +4124,14 @@ function capitalizeWords(str) {
 const LIBRARY_DEFAULT_TYPE = 'infographic';
 
 const LIBRARY_TYPE_ICONS = {
-    article: '📄',
-    study: '🔬',
-    report: '📕',
-    infographic: '📊',
-    video: '🎬',
-    podcast: '🎧',
-    dataset: '📈',
-    website: '🌐',
+    article: 'file',
+    study: 'flask',
+    report: 'book',
+    infographic: 'chart',
+    video: 'video',
+    podcast: 'headphones',
+    dataset: 'trend',
+    website: 'globe',
 };
 
 // Client-side filter state: sets so every facet is multi-select, matching the
@@ -3825,9 +4167,9 @@ async function initLibraryPage() {
 
         libraryBar = createFilterBar(document.getElementById('libraryControls'), {
             facets: [
-                { id: 'type', label: 'Type', icon: '🎬', options: libraryFacetOptions('type'), selected: [...libraryState.type] },
-                { id: 'topic', label: 'Topic', icon: '🏷', options: libraryFacetOptions('topic') },
-                { id: 'publisher', label: 'Publisher', icon: '🏢', options: libraryFacetOptions('publisher') },
+                { id: 'type', label: 'Type', icon: icon('file'), options: libraryFacetOptions('type'), selected: [...libraryState.type] },
+                { id: 'topic', label: 'Topic', icon: icon('tag'), options: libraryFacetOptions('topic') },
+                { id: 'publisher', label: 'Publisher', icon: icon('building'), options: libraryFacetOptions('publisher') },
             ],
             sort: {
                 label: 'Sort', value: libraryState.sort, options: [
@@ -3877,7 +4219,7 @@ function libraryFacetOptions(facet) {
     // Keep any currently-selected value visible even at count 0.
     libraryState[facet].forEach((v) => { if (!counts.has(v)) counts.set(v, 0); });
 
-    const label = (v) => facet === 'type' ? (LIBRARY_TYPE_ICONS[v] ? `${LIBRARY_TYPE_ICONS[v]} ` : '') + capitalizeWords(v) : v;
+    const label = (v) => facet === 'type' ? capitalizeWords(v) : v;
     return [...counts.entries()]
         .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
         .map(([value, count]) => ({ value, label: label(value), count }));
@@ -3954,7 +4296,7 @@ function renderLibraryGrid(resources) {
 
     grid.innerHTML = '';
     resources.forEach((r) => {
-        const icon = LIBRARY_TYPE_ICONS[r.type] || '📚';
+        const typeIcon = icon(LIBRARY_TYPE_ICONS[r.type] || 'book');
         const topics = (r.topics || []).slice(0, 4)
             .map((t) => `<button type="button" class="tag library-topic" data-topic="${escapeHtml(t)}">#${escapeHtml(t)}</button>`)
             .join('');
@@ -3982,7 +4324,7 @@ function renderLibraryGrid(resources) {
             <div class="library-card-body">
                 <div class="library-card-head">
                     <button type="button" class="library-type-badge" data-type="${escapeHtml(r.type)}">
-                        <span aria-hidden="true">${icon}</span> ${escapeHtml(r.type_label || r.type)}
+                        ${typeIcon} ${escapeHtml(r.type_label || r.type)}
                     </button>
                     <button type="button" class="library-publisher" data-publisher="${escapeHtml(r.publisher)}">${escapeHtml(r.publisher)}</button>
                 </div>

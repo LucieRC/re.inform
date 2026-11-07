@@ -1,0 +1,233 @@
+/* Contributor roles + source-verified stamp.
+   Kept apart from styles.css; uses its tokens so themes apply. */
+
+:root {
+    --stamp-ok: #1f6b38;
+    --stamp-ok-bg: rgba(41, 104, 62, 0.1);
+    --stamp-warn: #8a5a00;
+    --stamp-warn-bg: rgba(214, 185, 105, 0.22);
+}
+
+:root[data-color-scheme="dark"] {
+    --stamp-ok: #7fd19a;
+    --stamp-ok-bg: rgba(127, 209, 154, 0.12);
+    --stamp-warn: #e8cd85;
+    --stamp-warn-bg: rgba(214, 185, 105, 0.16);
+}
+
+/* ---- Stamp on a debunk card ---- */
+
+.source-stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.source-stamp.stamp-verified {
+    color: var(--stamp-ok);
+    background: var(--stamp-ok-bg);
+}
+
+.source-stamp.stamp-needs-work {
+    color: var(--stamp-warn);
+    background: var(--stamp-warn-bg);
+}
+
+.source-stamp.stamp-pending {
+    color: var(--text-light);
+    border: 1px dashed var(--border-color);
+}
+
+/* ---- Inline source-check row (sibling of .rate-row) ---- */
+
+.check-row {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.check-row[hidden] {
+    display: none;
+}
+
+.check-verdicts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.check-verdict[aria-pressed="true"] {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+.check-note {
+    width: 100%;
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-white);
+    color: var(--text-color);
+}
+
+.check-submit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.check-submit {
+    white-space: nowrap;
+}
+
+.check-hint {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+/* ---- Role chips (public profile header) ---- */
+
+.profile-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+}
+
+.role-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.role-chip.is-confirmed {
+    border-color: var(--stamp-ok);
+    color: var(--stamp-ok);
+}
+
+/* ---- Role cards (own profile rail) ---- */
+
+.roles-list {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.role-card {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.role-card.is-held {
+    border-color: var(--primary-color);
+}
+
+.role-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.role-card-name {
+    font-weight: 700;
+}
+
+.role-tier {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--bg-light);
+    color: var(--text-light);
+}
+
+.role-tier.tier-confirmed {
+    background: var(--stamp-ok-bg);
+    color: var(--stamp-ok);
+}
+
+.role-card p {
+    margin: 0.3rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.45;
+}
+
+.role-progress {
+    margin-top: 0.45rem;
+}
+
+.role-progress .level-track {
+    height: 0.4rem;
+    /* --bg-light matches the card in light mode, so use the border tone. */
+    background: var(--border-color);
+}
+
+.role-progress-label {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+.role-card-actions {
+    margin-top: 0.5rem;
+}
+
+.role-card-actions .link-btn {
+    font-size: 0.85rem;
+}
+
+/* ---- Source-check queue (own profile main column) ---- */
+
+.source-queue {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.queue-item {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.queue-item:hover,
+.queue-item:focus-visible {
+    border-color: var(--primary-color);
+}
+
+.queue-claim {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+.queue-text {
+    font-size: 0.95rem;
+}
+
+.queue-meta {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
