@@ -6,19 +6,18 @@ Nothing is deleted from your working data. Test content is *flagged*, and
 
 What counts as test data:
   - accounts flagged as test (users.is_test = 1), and everything they created:
-    claims, responses, resources, ratings, source checks, submissions,
-    contributions, follows, roles, avatars. Content a test account posts later
+    claims, responses, resources, ratings, source checks, follows, roles,
+    avatars. Content a test account posts later
     is caught automatically, with no extra step.
   - any record with "is_test": true, for test content that has no author
-    (e.g. a submission sent while logged out).
+    (e.g. a curated resource with no author).
 
     python bin/test_data.py report                      # what is flagged, what looks like a test
     python bin/test_data.py mark-user alice bob         # flag accounts  (--unmark to undo)
-    python bin/test_data.py mark submission 1           # flag one record (--unmark to undo)
+    python bin/test_data.py mark response 12            # flag one record (--unmark to undo)
     python bin/test_data.py export --out ../publish-data
 
-Record kinds for `mark`: claim, response, resource, submission, contribution,
-curated, gallery.
+Record kinds for `mark`: claim, response, resource, curated, gallery.
 
 Deploy the exported folder as backend/data/ on the published site.
 """
@@ -39,14 +38,12 @@ KINDS = {
     'claim': ('argumentation.json', 'arguments'),
     'response': ('argumentation.json', 'counter_arguments'),
     'resource': ('argumentation.json', 'resources'),
-    'submission': ('submissions.json', None),
-    'contribution': ('contributions.json', None),
     'curated': ('resources.json', None),
     'gallery': ('gallery.json', None),
 }
 
 # Plain list files whose records may carry a user_id or an is_test flag.
-LIST_FILES = ('submissions.json', 'contributions.json', 'resources.json', 'gallery.json')
+LIST_FILES = ('resources.json', 'gallery.json')
 
 # Tables that point at users, and the columns that do it.
 USER_REFS = {
@@ -184,8 +181,10 @@ def cmd_export(args):
         shutil.rmtree(out)
 
     # users.db is copied with SQLite's backup API, so a running server can't hand
-    # us a half-written file; everything else is copied as is.
-    shutil.copytree(src, out, ignore=shutil.ignore_patterns('users.db', 'users.db-*'))
+    # us a half-written file; everything else is copied as is, except the
+    # timestamped backups migration scripts leave next to the files (*.bak-*):
+    # they still hold any test content and must not be published.
+    shutil.copytree(src, out, ignore=shutil.ignore_patterns('users.db', 'users.db-*', '*.bak-*'))
     with sqlite3.connect(os.path.join(src, 'users.db')) as live, sqlite3.connect(os.path.join(out, 'users.db')) as copy:
         live.backup(copy)
 

@@ -8,7 +8,7 @@ confirmed. Tiers are never lowered automatically.
 
 The first role mechanic is the source-verified stamp on a debunk: Sourcers
 check whether the cited sources actually back it up, and the stamp is granted
-once weighted checks agree. See GAMIFICATION_DESIGN.md (Roles & stamps).
+once weighted checks agree. See docs/design/GAMIFICATION_DESIGN.md (Roles & stamps).
 
 Pure logic over the argumentation store + database; no Flask in here.
 """
@@ -142,17 +142,27 @@ def settle_source_rewards(store: Dict[str, Any], ca: Dict[str, Any], weights: Di
     return payouts
 
 
+# Why a source check is refused: stable code → English text (the frontend maps
+# the code to its own wording).
+CHECK_REFUSALS = {
+    'check_login_required': 'Log in to check sources.',
+    'check_sourcer_role_required': 'Take the Sourcer role on your profile to check sources.',
+    'check_own_debunk': 'You can’t check the sources of your own debunk.',
+    'check_no_sources': 'This debunk has no source to check.',
+}
+
+
 def can_check_source(user_id: Optional[int], site_role: Optional[str], ca: Dict[str, Any],
                      sourcer_ids: set) -> Tuple[bool, Optional[str]]:
-    """Whether this user may check this debunk's sources, and why not if not."""
+    """Whether this user may check this debunk's sources, and if not, the refusal code."""
     if user_id is None:
-        return False, 'Log in to check sources.'
+        return False, 'check_login_required'
     if user_id not in sourcer_ids and site_role not in ('moderator', 'admin'):
-        return False, 'Take the Sourcer role on your profile to check sources.'
+        return False, 'check_sourcer_role_required'
     if ca.get('created_by_user_id') == user_id:
-        return False, 'You can’t check the sources of your own debunk.'
+        return False, 'check_own_debunk'
     if not has_sources(ca):
-        return False, 'This debunk has no source to check.'
+        return False, 'check_no_sources'
     return True, None
 
 
@@ -164,8 +174,10 @@ def source_check_queue(store: Dict[str, Any], user_id: int, weights: Dict[int, i
     checks_by_ca = argstore.source_checks_by_counter(store)
 
     candidates = []
-    for ca in store.get('counter_arguments', []) or []:
-        if not isinstance(ca, dict) or not isinstance(ca.get('id'), int):
+    for ca in argstore.published(store.get('counter_arguments')):
+        if not isinstance(ca.get('id'), int):
+            continue
+        if not argstore.is_published(args_by_id.get(ca.get('argument_id'))):
             continue
         if ca.get('created_by_user_id') == user_id or not has_sources(ca):
             continue
@@ -223,8 +235,8 @@ def _wordsmith_done(store: Dict[str, Any], user_id: int) -> int:
             scores.setdefault(r.get('counter_argument_id'), []).append(r['score'])
 
     done = 0
-    for ca in store.get('counter_arguments', []) or []:
-        if not isinstance(ca, dict) or ca.get('created_by_user_id') != user_id:
+    for ca in argstore.published(store.get('counter_arguments')):
+        if ca.get('created_by_user_id') != user_id:
             continue
         s = scores.get(ca.get('id'), [])
         if len(s) >= WORDSMITH_MIN_RATINGS and sum(s) / len(s) >= WORDSMITH_MIN_AVG:
@@ -235,10 +247,10 @@ def _wordsmith_done(store: Dict[str, Any], user_id: int) -> int:
 def _progress(role: str, store: Dict[str, Any], user_id: int, weights: Dict[int, int]) -> Optional[Dict[str, Any]]:
     if role == 'sourcer':
         return {'done': _sourcer_done(store, user_id, weights), 'needed': SOURCER_CONFIRM_AFTER,
-                'unit': 'checks matching the final verdict'}
+                'unit': 'checks matching the final verdict', 'unit_code': 'checks_matching_verdict'}
     if role == 'wordsmith':
         return {'done': _wordsmith_done(store, user_id), 'needed': WORDSMITH_CONFIRM_AFTER,
-                'unit': 'debunks rated 3.5★+ by 3 members'}
+                'unit': 'debunks rated 3.5★+ by 3 members', 'unit_code': 'debunks_well_rated'}
     return None
 
 

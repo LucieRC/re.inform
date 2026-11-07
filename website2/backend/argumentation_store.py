@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 
 SCHEMA_VERSION = 1
@@ -32,6 +33,54 @@ def normalize_url(url: str) -> str:
     while u.endswith("/"):
         u = u[:-1]
     return u
+
+
+URL_ERROR = "Links must be full web addresses starting with http:// or https://"
+
+
+def is_http_url(url: str) -> bool:
+    """True for an absolute http(s) URL with a host.
+
+    This is the only kind of link accepted from users: it rules out
+    `javascript:`, `data:` and other schemes that would run when the stored
+    link is rendered and clicked.
+    """
+    u = (url or "").strip()
+    # Spaces or control characters inside a link are never legitimate and are
+    # a common way to smuggle a scheme past naive checks.
+    if not u or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in u):
+        return False
+    try:
+        parts = urlsplit(u)
+        host = parts.hostname
+    except ValueError:
+        return False
+    return parts.scheme.lower() in ("http", "https") and bool(host)
+
+
+# Review lifecycle for claims and answers. A record with no `status` is
+# published: everything written before the field existed was public, and the
+# normal write paths (POST /api/arguments, /api/counter-arguments) still publish
+# straight away. `pending` is waiting for an admin or trusted-member votes;
+# `rejected` stays in the file for the record but is never shown.
+STATUS_PUBLISHED = "published"
+STATUS_PENDING = "pending"
+STATUS_REJECTED = "rejected"
+CONTENT_STATUSES = (STATUS_PUBLISHED, STATUS_PENDING, STATUS_REJECTED)
+
+
+def status_of(item: Optional[Dict[str, Any]]) -> str:
+    status = (item or {}).get("status") if isinstance(item, dict) else None
+    return status if status in CONTENT_STATUSES else STATUS_PUBLISHED
+
+
+def is_published(item: Optional[Dict[str, Any]]) -> bool:
+    return isinstance(item, dict) and status_of(item) == STATUS_PUBLISHED
+
+
+def published(items: Optional[List[Any]]) -> List[Dict[str, Any]]:
+    """Only the records the public may see."""
+    return [it for it in (items or []) if is_published(it)]
 
 
 def load_json_file(filepath: str, default: Any) -> Any:
@@ -156,10 +205,18 @@ def upsert_argument(
     created_by_user_id: Optional[int] = None,
     tags: Optional[List[str]] = None,
     imported_from: Optional[Dict[str, Any]] = None,
+    status: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Create a claim, or return the existing one with the same text.
+
+    `status` only applies to a newly created claim; an existing claim keeps its
+    own status (a pending proposal never un-publishes a public claim).
+    """
     text_norm = normalize_text(text)
     if not text_norm:
         raise ValueError("Argument text is required")
+    if status is not None and status not in CONTENT_STATUSES:
+        raise ValueError(f"status must be one of: {', '.join(CONTENT_STATUSES)}")
 
     idx = _index_by_norm_text(store["arguments"], field="text")
     existing = idx.get(text_norm.lower())
@@ -174,6 +231,8 @@ def upsert_argument(
         "created_by_user_id": created_by_user_id,
         "imported_from": imported_from,
     }
+    if status and status != STATUS_PUBLISHED:
+        arg["status"] = status
     store["arguments"].append(arg)
     return arg
 
@@ -294,10 +353,13 @@ def create_counter_argument(
     resource_ids: Optional[List[int]] = None,
     created_by_user_id: Optional[int] = None,
     imported_from: Optional[Dict[str, Any]] = None,
+    status: Optional[str] = None,
 ) -> Dict[str, Any]:
     text_norm = normalize_text(text)
     if not text_norm:
         raise ValueError("Counter-argument text is required")
+    if status is not None and status not in CONTENT_STATUSES:
+        raise ValueError(f"status must be one of: {', '.join(CONTENT_STATUSES)}")
 
     # Light dedupe: same argument + persona + identical text
     for ca in store["counter_arguments"]:
@@ -321,8 +383,113 @@ def create_counter_argument(
         "created_by_user_id": created_by_user_id,
         "imported_from": imported_from,
     }
+    if status and status != STATUS_PUBLISHED:
+        counter["status"] = status
     store["counter_arguments"].append(counter)
     return counter
+
+
+def set_review_status(
+    store: Dict[str, Any],
+    counter: Dict[str, Any],
+    status: str,
+    *,
+    reviewed_by: Any = None,
+) -> None:
+    """Publish or reject a proposed answer, and its claim if that is new too.
+
+    A claim that arrived with the answer shares its fate: publishing the answer
+    publishes the claim; rejecting it rejects the claim unless another public
+    answer already hangs off it.
+    """
+    if status not in CONTENT_STATUSES:
+        raise ValueError(f"status must be one of: {', '.join(CONTENT_STATUSES)}")
+    now = _now_iso()
+    counter["status"] = status
+    counter["reviewed_at"] = now
+    counter["reviewed_by"] = reviewed_by
+
+    args_by_id, _ = build_indexes(store)
+    arg = args_by_id.get(counter.get("argument_id"))
+
+    # Answers in review keep their link on `source_url` only, so an unreviewed
+    # link never enters the shared Resources. It becomes one on publication.
+    if status == STATUS_PUBLISHED and not counter.get("resource_ids") and is_http_url(counter.get("source_url") or ""):
+        res = upsert_resource(
+            store,
+            counter["source_url"],
+            argument_ids=[arg["id"]] if arg else None,
+            created_by_user_id=counter.get("created_by_user_id"),
+        )
+        counter["resource_ids"] = [res["id"]]
+
+    if not arg or is_published(arg):
+        return
+    if status == STATUS_PUBLISHED:
+        arg["status"] = STATUS_PUBLISHED
+        arg["reviewed_at"] = now
+        arg["reviewed_by"] = reviewed_by
+    elif status == STATUS_REJECTED:
+        others = [
+            ca for ca in store.get("counter_arguments", []) or []
+            if isinstance(ca, dict) and ca is not counter
+            and ca.get("argument_id") == arg.get("id") and status_of(ca) != STATUS_REJECTED
+        ]
+        if not others:
+            arg["status"] = STATUS_REJECTED
+            arg["reviewed_at"] = now
+            arg["reviewed_by"] = reviewed_by
+
+
+def resource_urls_for(store: Dict[str, Any], counter: Dict[str, Any]) -> List[str]:
+    """A debunk's source links: its Resources, else the legacy source_url."""
+    res_by_id = resources_by_id(store)
+    urls = [res_by_id[rid].get("url") for rid in counter.get("resource_ids") or [] if rid in res_by_id]
+    urls = [u for u in urls if u]
+    if not urls and counter.get("source_url"):
+        urls = [counter["source_url"]]
+    return urls
+
+
+def legacy_contribution_view(
+    store: Dict[str, Any],
+    counter: Dict[str, Any],
+    *,
+    args_by_id: Optional[Dict[int, Dict[str, Any]]] = None,
+    personas_by_id: Optional[Dict[int, Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """One answer shaped like an old contributions.json entry.
+
+    contributions.json was retired in favour of this store; the endpoints that
+    used to serve it (/api/contributions, profile lists) build this view so old
+    callers keep working. `id` is the counter-argument id.
+    """
+    if args_by_id is None or personas_by_id is None:
+        args_by_id, personas_by_id = build_indexes(store)
+    arg = args_by_id.get(counter.get("argument_id"))
+    if not arg:
+        return None
+    persona = personas_by_id.get(counter.get("persona_archetype_id")) or {}
+    narrative = str(arg.get("text") or "")
+    title = (f"{persona['name']}: " if persona.get("name") else "") + narrative
+    if len(title) > 80:
+        title = title[:79].rstrip() + "…"
+    urls = resource_urls_for(store, counter)
+    return {
+        "id": counter.get("id"),
+        "counter_argument_id": counter.get("id"),
+        "argument_id": arg.get("id"),
+        "title": title,
+        "narrative": narrative,
+        "counter_argument": counter.get("text"),
+        "tags": list(arg.get("tags") or []),
+        "source": urls[0] if urls else None,
+        "sources": urls,
+        "persona_archetype_id": counter.get("persona_archetype_id"),
+        "date": counter.get("created_at"),
+        "status": status_of(counter),
+        "user_id": counter.get("created_by_user_id"),
+    }
 
 
 def create_rating(

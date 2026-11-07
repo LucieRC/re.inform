@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, send_from_directory, session
+from flask import Flask, request, jsonify, send_from_directory, session, has_request_context
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import json
 import os
 import secrets
+import time
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
@@ -16,7 +17,22 @@ import roles as roleslib
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-CORS(app, supports_credentials=True)
+
+# `ENV=production` turns the committed dev defaults from warnings into refusals.
+ENV = (os.environ.get('ENV') or 'development').strip().lower()
+
+# CORS: the frontend is served by this same app, so the browser needs no CORS
+# at all. Other origins (a separate dev server, a future domain) must be listed
+# in CORS_ORIGINS, comma-separated, e.g.
+#   CORS_ORIGINS=http://localhost:3000,https://reinform.example
+# Credentials (the login cookie) are only ever shared with those origins;
+# before, any site could make logged-in requests on a visitor's behalf.
+CORS_ORIGINS = [o.strip().rstrip('/') for o in (os.environ.get('CORS_ORIGINS') or '').split(',') if o.strip()]
+if CORS_ORIGINS:
+    CORS(app, resources={r'/api/*': {'origins': CORS_ORIGINS}}, supports_credentials=True)
+# The login cookie is not sent on cross-site POSTs (basic CSRF protection).
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 
 @app.after_request
@@ -43,8 +59,9 @@ login_manager.login_view = 'login'
 # Paths to data files
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 RESOURCES_FILE = os.path.join(DATA_DIR, 'resources.json')
-CONTRIBUTIONS_FILE = os.path.join(DATA_DIR, 'contributions.json')
-SUBMISSIONS_FILE = os.path.join(DATA_DIR, 'submissions.json')
+# Claims and answers live only in argumentation.json. The old contributions.json
+# and submissions.json were folded into it (bin/migrate_legacy_contributions.py)
+# and moved to archive/website2-legacy-data/.
 GALLERY_FILE = os.path.join(DATA_DIR, 'gallery.json')
 BONPOTE_GALLERY_FILE = os.path.join(DATA_DIR, 'bonpote_gallery.json')
 ARTICLES_DIR = os.path.join(DATA_DIR, 'articles')
@@ -74,16 +91,38 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'change_me_in_production')
 # unguessable token (replacing the old hardcoded 'admin_authenticated' constant,
 # which anyone reading the repo could forge). Tokens live only in memory, so a
 # server restart forces admins to log in again — acceptable for this stage.
-_active_admin_tokens = set()
+# Tokens expire after ADMIN_TOKEN_TTL seconds. token → expiry (epoch seconds).
+ADMIN_TOKEN_TTL = 12 * 3600
+ADMIN_LOGIN_ATTEMPTS_PER_DAY = 30
+_active_admin_tokens = {}
 
 
 def _is_valid_admin_token(req) -> bool:
-    """Return True if the request carries a valid 'Bearer <token>' admin token."""
+    """Return True if the request carries a valid, unexpired 'Bearer <token>' admin token."""
     auth = req.headers.get('Authorization', '')
     if not auth.startswith('Bearer '):
         return False
     token = auth[len('Bearer '):].strip()
-    return bool(token) and token in _active_admin_tokens
+    expiry = _active_admin_tokens.get(token) if token else None
+    if expiry is None:
+        return False
+    if expiry < time.time():
+        _active_admin_tokens.pop(token, None)
+        return False
+    return True
+
+
+def require_admin(f):
+    """Admin endpoints: a signed-in account with users.role 'admin', or the
+    admin-page token (password login, kept for the current admin page)."""
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if current_user.is_authenticated and current_user.role == 'admin':
+            return f(*args, **kwargs)
+        if _is_valid_admin_token(request):
+            return f(*args, **kwargs)
+        return api_error('admin_auth_required', 'Unauthorized', 401)
+    return wrapped
 
 #========================================
 # User Class for Flask-Login
@@ -123,7 +162,7 @@ def require_role(*roles):
         @login_required
         def wrapped(*args, **kwargs):
             if current_user.role not in roles:
-                return jsonify({'error': 'Insufficient permissions'}), 403
+                return api_error('forbidden_role', 'Insufficient permissions', 403)
             return f(*args, **kwargs)
         return wrapped
     return decorator
@@ -137,6 +176,79 @@ def get_vote_weight(role):
     }
     return weights.get(role, 0)
 
+# ========================================
+# Error responses
+# ========================================
+# Every error carries a stable machine `code` (snake_case, never translated)
+# next to the English `error` text, which stays for older callers. The frontend
+# maps `code` to its own wording. The full list is in backend/README.md.
+
+def api_error(code, message, status=400, **extra):
+    payload = {'error': message, 'code': code}
+    payload.update(extra)
+    return jsonify(payload), status
+
+
+# ValueErrors raised by the stores carry English text only; map them to codes.
+_VALUE_ERROR_CODES = (
+    ('Username or email already exists', 'account_exists'),
+    ('Cannot endorse yourself', 'endorse_self'),
+    ('Already endorsed this user', 'already_endorsed'),
+    ('Argument text is required', 'claim_text_required'),
+    ('Counter-argument text is required', 'answer_text_required'),
+    ('Resource URL is required', 'url_required'),
+    ('A resource URL is required', 'url_required'),
+    ('Score must be', 'invalid_score'),
+    ('verdict must be one of', 'invalid_verdict'),
+    ('status must be', 'invalid_status'),
+    ('type must be one of', 'invalid_type'),
+    ('Links must be full web addresses', 'invalid_url'),
+)
+
+
+def _value_error_code(exc):
+    text = str(exc)
+    for prefix, code in _VALUE_ERROR_CODES:
+        if text.startswith(prefix):
+            return code
+    return 'invalid_input'
+
+
+@login_manager.unauthorized_handler
+def _unauthorized():
+    # API callers get JSON, not a redirect to a POST-only login route.
+    return api_error('auth_required', 'Log in to do this.', 401)
+
+
+_HTTP_CODES = {400: 'bad_request', 401: 'auth_required', 403: 'forbidden', 404: 'not_found',
+               405: 'method_not_allowed', 413: 'payload_too_large', 429: 'rate_limited',
+               500: 'server_error'}
+
+
+@app.errorhandler(400)
+@app.errorhandler(404)
+@app.errorhandler(405)
+@app.errorhandler(413)
+@app.errorhandler(500)
+def _http_error(exc):
+    status = getattr(exc, 'code', 500) or 500
+    if not request.path.startswith('/api/'):
+        return exc if status != 500 else ('Internal Server Error', 500)
+    return api_error(_HTTP_CODES.get(status, f'http_{status}'),
+                     getattr(exc, 'description', None) or 'Request failed', status)
+
+
+@app.after_request
+def _ensure_error_code(response):
+    """Safety net: any JSON error that slipped through without a code gets one."""
+    if response.status_code >= 400 and response.is_json:
+        data = response.get_json(silent=True)
+        if isinstance(data, dict) and 'error' in data and 'code' not in data:
+            data['code'] = _HTTP_CODES.get(response.status_code, f'http_{response.status_code}')
+            response.set_data(json.dumps(data))
+    return response
+
+
 def load_json_file(filepath, default=None):
     """Load JSON file or return default if it doesn't exist."""
     if os.path.exists(filepath):
@@ -148,6 +260,21 @@ def save_json_file(filepath, data):
     """Save data to JSON file."""
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+def site_url():
+    """Public base URL of the site, for links in emails and other out-of-page text.
+
+    SITE_URL wins when set (e.g. behind a proxy or on a real domain). Otherwise
+    the host the current request came in on, and outside a request the port
+    this process listens on (PORT, default 5002).
+    """
+    configured = (os.environ.get('SITE_URL') or '').strip()
+    if configured:
+        return configured.rstrip('/')
+    if has_request_context():
+        return request.host_url.rstrip('/')
+    return f"http://localhost:{int(os.environ.get('PORT', 5002))}"
+
 
 def send_email_notification(submission):
     """Send email notification for new submission (configure with your email settings)."""
@@ -179,7 +306,7 @@ def send_email_notification(submission):
         Source: {submission.get('source', 'N/A')}
         Date: {submission['submitted_at']}
         
-        Review at: {os.environ.get('SITE_URL', 'http://localhost:5000')}/admin
+        Review at: {site_url()}/admin
         """
         
         message.attach(MIMEText(body, 'plain'))
@@ -223,13 +350,13 @@ def register():
         
         # Validation
         if not username or not email or not password:
-            return jsonify({'error': 'All fields are required'}), 400
+            return api_error('fields_required', 'All fields are required', 400)
         
         if len(username) < 3:
-            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+            return api_error('username_too_short', 'Username must be at least 3 characters', 400)
         
         if len(password) < 6:
-            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+            return api_error('password_too_short', 'Password must be at least 6 characters', 400)
         
         # Create user
         try:
@@ -242,6 +369,7 @@ def register():
             return jsonify({
                 'success': True,
                 'message': 'Registration successful',
+                'code': 'registered',
                 'claimed_votes': claimed_votes,
                 'user': {
                     'id': user.id,
@@ -253,13 +381,13 @@ def register():
                 }
             }), 201
         except ValueError as e:
-            return jsonify({'error': str(e)}), 400
+            return api_error(_value_error_code(e), str(e), 400)
             
     except Exception as e:
         import traceback
         print(f"Registration error: {e}")
         traceback.print_exc()
-        return jsonify({'error': 'Registration failed'}), 500
+        return api_error('server_error', 'Registration failed', 500)
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -271,16 +399,16 @@ def login():
         remember = data.get('remember', False)
         
         if not username or not password:
-            return jsonify({'error': 'Username and password required'}), 400
+            return api_error('credentials_required', 'Username and password required', 400)
         
         # Get user
         user_dict = db.get_user_by_username(username)
         if not user_dict:
-            return jsonify({'error': 'Invalid username or password'}), 401
+            return api_error('invalid_credentials', 'Invalid username or password', 401)
         
         # Verify password
         if not db.verify_password(user_dict, password):
-            return jsonify({'error': 'Invalid username or password'}), 401
+            return api_error('invalid_credentials', 'Invalid username or password', 401)
         
         # Login user
         user = User(user_dict)
@@ -290,6 +418,7 @@ def login():
         return jsonify({
             'success': True,
             'message': 'Login successful',
+            'code': 'logged_in',
             'claimed_votes': claimed_votes,
             'user': {
                 'id': user.id,
@@ -303,14 +432,14 @@ def login():
         
     except Exception as e:
         print(f"Login error: {e}")
-        return jsonify({'error': 'Login failed'}), 500
+        return api_error('server_error', 'Login failed', 500)
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
     """Logout current user."""
     logout_user()
-    return jsonify({'success': True, 'message': 'Logged out successfully'})
+    return jsonify({'success': True, 'message': 'Logged out successfully', 'code': 'logged_out'})
 
 @app.route('/api/current-user', methods=['GET'])
 def get_current_user():
@@ -366,11 +495,11 @@ def serve_user_avatar(user_id):
     user_dict = db.get_user_by_id(user_id)
     file_name = (user_dict or {}).get('avatar_file')
     if not user_dict or not file_name:
-        return jsonify({'error': 'Avatar not found'}), 404
+        return api_error('avatar_not_found', 'Avatar not found', 404)
     # The filename is generated by us (never user-controlled), so directory
     # traversal isn't possible — but stay explicit anyway.
     if os.path.basename(file_name) != file_name:
-        return jsonify({'error': 'Avatar not found'}), 404
+        return api_error('avatar_not_found', 'Avatar not found', 404)
     return send_from_directory(AVATARS_DIR, file_name, max_age=3600)
 
 
@@ -380,15 +509,15 @@ def upload_avatar():
     """Upload or replace the signed-in user's profile picture."""
     file = request.files.get('avatar')
     if not file or not file.filename:
-        return jsonify({'error': 'No file provided'}), 400
+        return api_error('file_required', 'No file provided', 400)
 
     ext = _sniff_image_ext(file.stream)
     if not ext:
-        return jsonify({'error': 'Unsupported image format (use JPG, PNG, GIF or WebP)'}), 400
+        return api_error('unsupported_image', 'Unsupported image format (use JPG, PNG, GIF or WebP)', 400)
 
     file.seek(0, os.SEEK_END)
     if file.tell() > AVATAR_MAX_BYTES:
-        return jsonify({'error': 'Image is too large (max 3 MB)'}), 413
+        return api_error('image_too_large', 'Image is too large (max 3 MB)', 413)
     file.seek(0)
 
     # Deterministic name: a re-upload replaces the previous picture.
@@ -430,17 +559,30 @@ def get_user_profile(user_id):
     """Get user profile."""
     user_dict = db.get_user_by_id(user_id)
     if not user_dict:
-        return jsonify({'error': 'User not found'}), 404
+        return api_error('user_not_found', 'User not found', 404)
     
     endorsements = db.get_user_endorsements(user_id)
-    
-    # Get user's contributions (from submissions with user_id)
-    submissions = load_json_file(SUBMISSIONS_FILE, [])
-    user_submissions = [s for s in submissions if s.get('user_id') == user_id]
-    
-    contributions = load_json_file(CONTRIBUTIONS_FILE, [])
-    user_contributions = [c for c in contributions if c.get('user_id') == user_id]
-    
+
+    # The user's answers, from the argumentation store (the single source of
+    # truth since contributions.json/submissions.json were retired). Public
+    # list = published answers; submission_count also counts ones in review.
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    args_by_id, personas_by_id = argstore.build_indexes(store)
+    own_answers = [
+        ca for ca in (store.get('counter_arguments') or [])
+        if isinstance(ca, dict) and ca.get('created_by_user_id') == user_id
+        and argstore.status_of(ca) != argstore.STATUS_REJECTED
+    ]
+    user_contributions = []
+    for ca in own_answers:
+        if not argstore.is_published(ca) or not argstore.is_published(args_by_id.get(ca.get('argument_id'))):
+            continue
+        view = argstore.legacy_contribution_view(store, ca, args_by_id=args_by_id, personas_by_id=personas_by_id)
+        if view:
+            view['username'] = user_dict['username']
+            user_contributions.append(view)
+    user_contributions.sort(key=lambda c: str(c.get('date') or ''), reverse=True)
+
     # Get following stats
     following_count = db.get_following_count(user_id)
     followers_count = db.get_followers_count(user_id)
@@ -464,10 +606,9 @@ def get_user_profile(user_id):
         },
         'endorsements': endorsements,
         # Public roles only: Field Agent stays private (see roles.ROLE_CATALOG).
-        'roles': roleslib.describe_roles(
-            argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE), user_id, public_only=True),
+        'roles': roleslib.describe_roles(store, user_id, public_only=True),
         'contribution_count': len(user_contributions),
-        'submission_count': len(user_submissions),
+        'submission_count': len(own_answers),
         'following_count': following_count,
         'followers_count': followers_count,
         'is_following': is_following,
@@ -480,25 +621,39 @@ def get_user_profile(user_id):
 def my_contributions():
     """The signed-in user's own submissions with their review status.
 
-    Powers the profile 'status tracker': counter-narrative submissions (with
-    pending/approved/rejected status) and resources they submitted to the library
-    (with the library's review status). Own-profile only — never exposed for
-    another user, since pending/rejected work is private.
+    Powers the profile 'status tracker': the user's answers in the argumentation
+    store (published answers show as 'approved', plus any pending/rejected) and
+    resources they submitted to the library (with the library's review status).
+    Own-profile only — never exposed for another user, since pending/rejected
+    work is private.
     """
     uid = current_user.id
     items = []
 
-    # Counter-narrative submissions.
-    for s in load_json_file(SUBMISSIONS_FILE, []):
-        if not isinstance(s, dict) or s.get('user_id') != uid:
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    args_by_id, _personas = argstore.build_indexes(store)
+    tracker_status = {
+        argstore.STATUS_PUBLISHED: 'approved',
+        argstore.STATUS_PENDING: 'pending',
+        argstore.STATUS_REJECTED: 'rejected',
+    }
+    for ca in store.get('counter_arguments') or []:
+        if not isinstance(ca, dict) or ca.get('created_by_user_id') != uid:
             continue
-        narrative = (s.get('narrative') or s.get('counter_argument') or '').strip()
+        arg = args_by_id.get(ca.get('argument_id')) or {}
+        title = str(arg.get('text') or ca.get('text') or '').strip()
+        urls = argstore.resource_urls_for(store, ca)
+        status = argstore.status_of(ca)
         items.append({
             'kind': 'response',
-            'title': narrative[:140] or 'Untitled response',
-            'status': (s.get('status') or 'pending').lower(),
-            'submitted_at': s.get('submitted_at'),
-            'source': s.get('source'),
+            'title': title[:140] or 'Untitled response',
+            'status': tracker_status[status],
+            'submitted_at': ca.get('created_at'),
+            'source': urls[0] if urls else None,
+            'argument_id': ca.get('argument_id'),
+            'counter_argument_id': ca.get('id'),
+            'href': (f"argument.html?id={ca.get('argument_id')}"
+                     if status == argstore.STATUS_PUBLISHED and argstore.is_published(arg) else None),
         })
 
     # Resources the user submitted to the library, with their review status.
@@ -530,9 +685,9 @@ def following_activity():
     """Recent actions by the people the signed-in user follows.
 
     There's no event log, so this synthesizes a feed from timestamped items the
-    followed users authored: approved contributions, counter-arguments in the
-    argumentation store, and resources they submitted. Content-first (names the
-    thing, not points); bare ratings are intentionally left out as too noisy.
+    followed users authored: published counter-arguments in the argumentation
+    store, and resources they submitted. Content-first (names the thing, not
+    points); bare ratings are intentionally left out as too noisy.
     """
     followed = {u['id']: u for u in db.get_following(current_user.id)}
     if not followed:
@@ -544,28 +699,19 @@ def following_activity():
 
     events = []
 
-    # Approved contributions (community feed).
-    for c in load_json_file(CONTRIBUTIONS_FILE, []):
-        uid = c.get('user_id')
-        if uid in followed and c.get('date'):
-            events.append({
-                'user': {'id': uid, 'username': followed[uid]['username']},
-                'kind': 'response',
-                'verb': 'answered a claim',
-                'title': _snippet(c.get('title') or c.get('narrative')),
-                'at': c.get('date'),
-                'href': None,
-            })
-
     # Counter-arguments and submitted resources from the argumentation store.
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
-    for ca in (store.get('counter_arguments') or []):
+    public_arg_ids = {a.get('id') for a in argstore.published(store.get('arguments'))}
+    for ca in argstore.published(store.get('counter_arguments')):
         uid = ca.get('created_by_user_id')
+        if ca.get('argument_id') not in public_arg_ids:
+            continue
         if uid in followed and ca.get('created_at'):
             events.append({
                 'user': {'id': uid, 'username': followed[uid]['username']},
                 'kind': 'response',
                 'verb': 'wrote a response',
+                'verb_code': 'wrote_response',
                 'title': _snippet(ca.get('text')),
                 'at': ca.get('created_at'),
                 'href': f"argument.html?id={ca.get('argument_id')}" if ca.get('argument_id') is not None else None,
@@ -577,6 +723,7 @@ def following_activity():
                 'user': {'id': uid, 'username': followed[uid]['username']},
                 'kind': 'source',
                 'verb': 'shared a source',
+                'verb_code': 'shared_source',
                 'title': _snippet(r.get('title') or r.get('url')),
                 'at': r.get('created_at'),
                 'href': r.get('url'),
@@ -615,32 +762,32 @@ def get_user_followed_tags(user_id):
 def follow_tag(user_id):
     """Follow a tag."""
     if current_user.id != user_id:
-        return jsonify({'error': 'Unauthorized'}), 403
+        return api_error('not_your_account', 'Unauthorized', 403)
     
     data = request.get_json()
     tag = data.get('tag', '').strip().lower()
     
     if not tag:
-        return jsonify({'error': 'Tag is required'}), 400
+        return api_error('tag_required', 'Tag is required', 400)
     
     success = db.follow_tag(user_id, tag)
     if success:
-        return jsonify({'success': True, 'message': f'Now following #{tag}'})
+        return jsonify({'success': True, 'message': f'Now following #{tag}', 'code': 'tag_followed', 'tag': tag})
     else:
-        return jsonify({'error': 'Already following this tag'}), 400
+        return api_error('already_following_tag', 'Already following this tag', 400)
 
 @app.route('/api/user/<int:user_id>/followed-tags/<tag>', methods=['DELETE'])
 @login_required
 def unfollow_tag(user_id, tag):
     """Unfollow a tag."""
     if current_user.id != user_id:
-        return jsonify({'error': 'Unauthorized'}), 403
+        return api_error('not_your_account', 'Unauthorized', 403)
     
     success = db.unfollow_tag(user_id, tag)
     if success:
-        return jsonify({'success': True, 'message': f'Unfollowed #{tag}'})
+        return jsonify({'success': True, 'message': f'Unfollowed #{tag}', 'code': 'tag_unfollowed', 'tag': tag})
     else:
-        return jsonify({'error': 'Not following this tag'}), 400
+        return api_error('not_following_tag', 'Not following this tag', 400)
 
 # ========================================
 # User Following API
@@ -671,18 +818,18 @@ def get_user_followers(user_id):
 def follow_user_endpoint(user_id):
     """Follow a user."""
     if current_user.id == user_id:
-        return jsonify({'error': 'Cannot follow yourself'}), 400
+        return api_error('follow_self', 'Cannot follow yourself', 400)
     
     # Check if target user exists
     target_user = db.get_user_by_id(user_id)
     if not target_user:
-        return jsonify({'error': 'User not found'}), 404
+        return api_error('user_not_found', 'User not found', 404)
     
     success = db.follow_user(current_user.id, user_id)
     if success:
-        return jsonify({'success': True, 'message': f'Now following {target_user["username"]}'})
+        return jsonify({'success': True, 'message': f'Now following {target_user["username"]}', 'code': 'user_followed'})
     else:
-        return jsonify({'error': 'Already following this user'}), 400
+        return api_error('already_following_user', 'Already following this user', 400)
 
 @app.route('/api/user/<int:user_id>/follow', methods=['DELETE'])
 @login_required
@@ -690,9 +837,9 @@ def unfollow_user_endpoint(user_id):
     """Unfollow a user."""
     success = db.unfollow_user(current_user.id, user_id)
     if success:
-        return jsonify({'success': True, 'message': 'Unfollowed user'})
+        return jsonify({'success': True, 'message': 'Unfollowed user', 'code': 'user_unfollowed'})
     else:
-        return jsonify({'error': 'Not following this user'}), 400
+        return api_error('not_following_user', 'Not following this user', 400)
 
 @app.route('/api/user/<int:user_id>/is-following', methods=['GET'])
 def check_is_following(user_id):
@@ -707,11 +854,38 @@ def check_is_following(user_id):
 # API Routes
 # ========================================
 
+def _published_contribution_views(store):
+    """Every public answer, shaped like the old contributions.json entries."""
+    args_by_id, personas_by_id = argstore.build_indexes(store)
+    usernames = {}
+    out = []
+    for ca in argstore.published(store.get('counter_arguments')):
+        if not argstore.is_published(args_by_id.get(ca.get('argument_id'))):
+            continue
+        view = argstore.legacy_contribution_view(store, ca, args_by_id=args_by_id, personas_by_id=personas_by_id)
+        if not view:
+            continue
+        uid = view.get('user_id')
+        if isinstance(uid, int):
+            if uid not in usernames:
+                u = db.get_user_by_id(uid)
+                usernames[uid] = u['username'] if u else None
+            view['username'] = usernames[uid]
+        out.append(view)
+    return out
+
+
 @app.route('/api/contributions', methods=['GET'])
 def get_contributions():
-    """Get all approved contributions from the community."""
-    contributions = load_json_file(CONTRIBUTIONS_FILE, [])
-    
+    """All public answers, in the old contributions.json shape.
+
+    Kept for old callers: contributions.json is retired and this is now a view
+    over the argumentation store (`id` is the counter-argument id). New code
+    should read /api/arguments and /api/arguments/<id>.
+    """
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    contributions = _published_contribution_views(store)
+
     # Optional filtering and sorting
     sort_by = request.args.get('sort', 'date')  # date, title
     tag_filter = request.args.get('tag', None)
@@ -722,9 +896,9 @@ def get_contributions():
     
     # Sort
     if sort_by == 'title':
-        contributions.sort(key=lambda x: x.get('title', ''))
+        contributions.sort(key=lambda x: str(x.get('title') or ''))
     else:  # date
-        contributions.sort(key=lambda x: x.get('date', ''), reverse=True)
+        contributions.sort(key=lambda x: str(x.get('date') or ''), reverse=True)
     
     return jsonify(contributions)
 
@@ -833,75 +1007,52 @@ def get_article_markdown(filename: str):
 
     # Minimal validation: only serve markdown files from the articles dir.
     if not filename or not filename.lower().endswith('.md'):
-        return jsonify({'error': 'Not found'}), 404
+        return api_error('not_found', 'Not found', 404)
 
     return send_from_directory(ARTICLES_DIR, filename, mimetype='text/markdown; charset=utf-8')
 
 
 @app.route('/api/submit-contribution', methods=['POST'])
 def submit_contribution():
-    """Submit a new counter-narrative contribution."""
-    try:
-        data = request.get_json()
-        
-        # Check rate limiting
-        user_id = current_user.id if current_user.is_authenticated else None
-        ip_address = request.remote_addr
-        limit = 20 if current_user.is_authenticated else 5
-        
-        if not db.check_rate_limit(user_id, ip_address, 'submission', limit):
-            return jsonify({'error': f'Rate limit exceeded. Maximum {limit} submissions per day.'}), 429
-        
-        # Validate required fields
-        if not data.get('source'):
-            return jsonify({'error': 'Source is required'}), 400
-        
-        # Load existing submissions
-        submissions = load_json_file(SUBMISSIONS_FILE, [])
-        
-        # Create new submission
-        submission = {
-            'id': len(submissions) + 1,
-            'narrative': data.get('narrative', '').strip(),
-            'counter_argument': data.get('counter_argument', '').strip(),
-            'source': data['source'].strip(),
-            'tags': data.get('tags', []),
-            'submitted_at': datetime.now().isoformat(),
-            'status': 'pending',
-            'user_id': user_id,
-            'username': current_user.username if current_user.is_authenticated else None
-        }
-        
-        # Add to submissions
-        submissions.append(submission)
-        save_json_file(SUBMISSIONS_FILE, submissions)
-        
-        # Send email notification
-        send_email_notification(submission)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Contribution submitted successfully! It will soon be reviewed by our team.',
-            'submission_id': submission['id']
-        }), 201
-        
-    except Exception as e:
-        print(f"Error submitting contribution: {e}")
-        return jsonify({'error': 'Failed to submit contribution'}), 500
+    """Retired: the free-text claim+answer form.
+
+    Contributions now go straight into the argumentation store as structured
+    entities: create (or find) the claim with POST /api/arguments, then post
+    the answer with POST /api/counter-arguments (one target persona, optional
+    sources). Nothing is written here any more.
+    """
+    return api_error(
+        'endpoint_moved',
+        'This form has moved. Add the claim with POST /api/arguments, '
+        'then the answer with POST /api/counter-arguments.',
+        410,
+        moved_to=['/api/arguments', '/api/counter-arguments'],
+    )
 
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
-    """Simple admin login."""
-    data = request.get_json()
-    password = data.get('password', '')
-    
+    """Password login for the admin page; returns a short-lived bearer token."""
+    data = request.get_json(silent=True) or {}
+    password = str(data.get('password') or '')
+
+    if ENV == 'production' and ADMIN_PASSWORD == 'change_me_in_production':
+        return api_error('admin_password_not_set',
+                         'Admin login is disabled until ADMIN_PASSWORD is set.', 503)
+    # Every attempt counts, so the password can't be guessed by brute force.
+    if not db.check_rate_limit(None, request.remote_addr, 'admin_login', ADMIN_LOGIN_ATTEMPTS_PER_DAY):
+        return api_error('rate_limited', 'Too many admin login attempts today.', 429)
+
     # Constant-time comparison to avoid leaking the password via timing.
     if password and secrets.compare_digest(password, ADMIN_PASSWORD):
         token = secrets.token_urlsafe(32)
-        _active_admin_tokens.add(token)
-        return jsonify({'success': True, 'token': token})
+        now = time.time()
+        for t, exp in list(_active_admin_tokens.items()):
+            if exp < now:
+                _active_admin_tokens.pop(t, None)
+        _active_admin_tokens[token] = now + ADMIN_TOKEN_TTL
+        return jsonify({'success': True, 'token': token, 'expires_in': ADMIN_TOKEN_TTL})
     else:
-        return jsonify({'error': 'Invalid password'}), 401
+        return api_error('invalid_admin_password', 'Invalid password', 401)
 
 
 @app.route('/api/admin/logout', methods=['POST'])
@@ -909,86 +1060,120 @@ def admin_logout():
     """Invalidate the current admin token."""
     auth = request.headers.get('Authorization', '')
     if auth.startswith('Bearer '):
-        _active_admin_tokens.discard(auth[len('Bearer '):].strip())
+        _active_admin_tokens.pop(auth[len('Bearer '):].strip(), None)
     return jsonify({'success': True})
 
-@app.route('/api/admin/submissions', methods=['GET'])
-def get_submissions():
-    """Get all pending submissions (requires authentication)."""
-    if not _is_valid_admin_token(request):
-        return jsonify({'error': 'Unauthorized'}), 401
+# ========================================
+# Review queue (answers awaiting approval)
+# ========================================
+# The old submissions.json queue now lives in the argumentation store: an answer
+# with status 'pending' (and its claim, if that is new too) waits here until an
+# admin approves or rejects it, or trusted members vote it through. The URLs and
+# response shape are the old ones so the admin page keeps working; `id` is now
+# the counter-argument id.
 
-    submissions = load_json_file(SUBMISSIONS_FILE, [])
-    return jsonify(submissions)
+def _review_items(store):
+    """Answers that went (or are going) through review, as admin cards."""
+    args_by_id, _personas = argstore.build_indexes(store)
+    shown = {'published': 'approved', 'pending': 'pending', 'rejected': 'rejected'}
+    out = []
+    for ca in store.get('counter_arguments') or []:
+        if not isinstance(ca, dict):
+            continue
+        status = argstore.status_of(ca)
+        if status == argstore.STATUS_PUBLISHED and not ca.get('reviewed_at'):
+            continue  # published directly, never queued
+        arg = args_by_id.get(ca.get('argument_id')) or {}
+        urls = argstore.resource_urls_for(store, ca)
+        uid = ca.get('created_by_user_id')
+        user = db.get_user_by_id(uid) if isinstance(uid, int) else None
+        out.append({
+            'id': ca.get('id'),
+            'counter_argument_id': ca.get('id'),
+            'argument_id': ca.get('argument_id'),
+            'argument_is_new': argstore.status_of(arg) != argstore.STATUS_PUBLISHED or bool(arg.get('reviewed_at')),
+            'narrative': arg.get('text'),
+            'counter_argument': ca.get('text'),
+            'source': urls[0] if urls else None,
+            'sources': urls,
+            'tags': list(arg.get('tags') or []),
+            'persona_archetype_id': ca.get('persona_archetype_id'),
+            'submitted_at': ca.get('created_at'),
+            'status': shown[status],
+            'reviewed_at': ca.get('reviewed_at'),
+            'user_id': uid,
+            'username': user['username'] if user else None,
+        })
+    return out
+
+
+def _find_counter(store, counter_argument_id):
+    return next((c for c in store.get('counter_arguments') or []
+                 if isinstance(c, dict) and c.get('id') == counter_argument_id), None)
+
+
+@app.route('/api/admin/submissions', methods=['GET'])
+@require_admin
+def get_submissions():
+    """Answers in the review queue, plus ones already reviewed (admin token)."""
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    return jsonify(_review_items(store))
 
 @app.route('/api/admin/approve-submission/<int:submission_id>', methods=['POST'])
+@require_admin
 def approve_submission(submission_id):
-    """Approve a submission and add it to counter-arguments."""
-    if not _is_valid_admin_token(request):
-        return jsonify({'error': 'Unauthorized'}), 401
+    """Publish a pending answer (and its claim if new). `submission_id` is the counter-argument id.
 
+    Optional body: {tags: [...]} adds topic tags to the claim. A `title` is
+    accepted for old callers but ignored: answers have no title of their own.
+    """
     try:
-        data = request.get_json()
-        
-        # Load submissions
-        submissions = load_json_file(SUBMISSIONS_FILE, [])
-        submission = next((s for s in submissions if s['id'] == submission_id), None)
-        
-        if not submission:
-            return jsonify({'error': 'Submission not found'}), 404
-        
-        # Load contributions
-        contributions = load_json_file(CONTRIBUTIONS_FILE, [])
-        
-        # Create contribution entry from submission
-        contribution = {
-            'id': len(contributions) + 1,
-            'title': data.get('title', f"Contribution #{len(contributions) + 1}"),
-            'narrative': submission['narrative'],
-            'counter_argument': submission['counter_argument'],
-            'tags': submission.get('tags', []),
-            'source': submission.get('source', ''),
-            'date': datetime.now().isoformat(),
-            'submission_id': submission_id
-        }
-        
-        # Add to contributions
-        contributions.append(contribution)
-        save_json_file(CONTRIBUTIONS_FILE, contributions)
-        
-        # Update submission status
-        submission['status'] = 'approved'
-        save_json_file(SUBMISSIONS_FILE, submissions)
-        
-        return jsonify({'success': True, 'contribution': contribution})
-        
+        data = request.get_json(silent=True) or {}
+        store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+        ca = _find_counter(store, submission_id)
+        if not ca or argstore.status_of(ca) != argstore.STATUS_PENDING:
+            return api_error('submission_not_pending', 'Submission not found or not pending', 404)
+
+        # Anything saved before links were checked could hold an unsafe one;
+        # don't publish it.
+        for url in argstore.resource_urls_for(store, ca):
+            if not argstore.is_http_url(url):
+                return api_error('invalid_url', f'This submission\'s source is not a valid web link. {argstore.URL_ERROR}', 400)
+
+        argstore.set_review_status(store, ca, argstore.STATUS_PUBLISHED, reviewed_by='admin')
+        tags = data.get('tags')
+        if isinstance(tags, list):
+            args_by_id, _ = argstore.build_indexes(store)
+            arg = args_by_id.get(ca.get('argument_id'))
+            if arg is not None:
+                clean = [argstore.normalize_text(str(t)) for t in tags if argstore.normalize_text(str(t or ''))]
+                arg['tags'] = argstore._merge_unique(arg.get('tags'), clean)
+        argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
+
+        view = next((v for v in _review_items(store) if v['id'] == submission_id), None)
+        return jsonify({'success': True, 'contribution': view})
+
     except Exception as e:
         print(f"Error approving submission: {e}")
-        return jsonify({'error': 'Failed to approve submission'}), 500
+        return api_error('server_error', 'Failed to approve submission', 500)
 
 @app.route('/api/admin/reject-submission/<int:submission_id>', methods=['POST'])
+@require_admin
 def reject_submission(submission_id):
-    """Reject a submission."""
-    if not _is_valid_admin_token(request):
-        return jsonify({'error': 'Unauthorized'}), 401
-
+    """Reject a pending answer. `submission_id` is the counter-argument id."""
     try:
-        # Load submissions
-        submissions = load_json_file(SUBMISSIONS_FILE, [])
-        submission = next((s for s in submissions if s['id'] == submission_id), None)
-        
-        if not submission:
-            return jsonify({'error': 'Submission not found'}), 404
-        
-        # Update submission status
-        submission['status'] = 'rejected'
-        save_json_file(SUBMISSIONS_FILE, submissions)
-        
+        store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+        ca = _find_counter(store, submission_id)
+        if not ca or argstore.status_of(ca) != argstore.STATUS_PENDING:
+            return api_error('submission_not_pending', 'Submission not found or not pending', 404)
+
+        argstore.set_review_status(store, ca, argstore.STATUS_REJECTED, reviewed_by='admin')
+        argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
         return jsonify({'success': True})
-        
+
     except Exception as e:
         print(f"Error rejecting submission: {e}")
-        return jsonify({'error': 'Failed to reject submission'}), 500
+        return api_error('server_error', 'Failed to reject submission', 500)
 
 # ========================================
 # Voting Endpoints
@@ -997,67 +1182,50 @@ def reject_submission(submission_id):
 @app.route('/api/vote/<int:submission_id>', methods=['POST'])
 @require_role('trusted', 'moderator', 'admin')
 def vote_submission(submission_id):
-    """Vote on a submission (trusted+ only)."""
+    """Vote on a pending answer (trusted+ only). `submission_id` is the counter-argument id."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         vote_type = data.get('vote_type')  # approve, reject, needs_work
-        
+
         if vote_type not in ['approve', 'reject', 'needs_work']:
-            return jsonify({'error': 'Invalid vote type'}), 400
-        
+            return api_error('invalid_vote_type', 'Invalid vote type', 400)
+
+        store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+        ca = _find_counter(store, submission_id)
+        if not ca or argstore.status_of(ca) != argstore.STATUS_PENDING:
+            return api_error('submission_not_pending', 'Submission not found or not pending', 404)
+
         # Check rate limit
         if not db.check_rate_limit(current_user.id, request.remote_addr, 'vote', 50):
-            return jsonify({'error': 'Rate limit exceeded. Maximum 50 votes per day.'}), 429
-        
+            return api_error('rate_limited', 'Rate limit exceeded. Maximum 50 votes per day.', 429)
+
         # Get vote weight based on role
         weight = get_vote_weight(current_user.role)
-        
+
         # Create vote
         db.create_vote(current_user.id, submission_id, vote_type, weight)
-        
+
         # Get vote summary
         vote_summary = db.get_vote_summary(submission_id)
-        
+
         # Auto-approve if score >= 3
         if vote_summary['approve_score'] >= 3:
-            # Load submissions and approve
-            submissions = load_json_file(SUBMISSIONS_FILE, [])
-            submission = next((s for s in submissions if s['id'] == submission_id), None)
-            
-            if submission and submission['status'] == 'pending':
-                # Create contribution
-                contributions = load_json_file(CONTRIBUTIONS_FILE, [])
-                contribution = {
-                    'id': len(contributions) + 1,
-                    'title': f"Contribution #{len(contributions) + 1}",
-                    'narrative': submission.get('narrative', ''),
-                    'counter_argument': submission.get('counter_argument', ''),
-                    'tags': submission.get('tags', []),
-                    'source': submission.get('source', ''),
-                    'date': datetime.now().isoformat(),
-                    'submission_id': submission_id,
-                    'user_id': submission.get('user_id'),
-                    'username': submission.get('username')
-                }
-                contributions.append(contribution)
-                save_json_file(CONTRIBUTIONS_FILE, contributions)
-                
-                # Update submission status
-                submission['status'] = 'approved'
-                save_json_file(SUBMISSIONS_FILE, submissions)
-                
-                # Award reputation to contributor
-                if submission.get('user_id'):
-                    db.update_user_reputation(submission['user_id'], 10)
-        
+            argstore.set_review_status(store, ca, argstore.STATUS_PUBLISHED,
+                                       reviewed_by={'votes': vote_summary['approve_score']})
+            argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
+
+            # Award reputation to contributor
+            if isinstance(ca.get('created_by_user_id'), int):
+                db.update_user_reputation(ca['created_by_user_id'], 10)
+
         return jsonify({
             'success': True,
             'vote_summary': vote_summary
         })
-        
+
     except Exception as e:
         print(f"Error voting: {e}")
-        return jsonify({'error': 'Failed to record vote'}), 500
+        return api_error('server_error', 'Failed to record vote', 500)
 
 @app.route('/api/submission/<int:submission_id>/votes', methods=['GET'])
 @require_role('trusted', 'moderator', 'admin')
@@ -1079,21 +1247,21 @@ def endorse_user(user_id):
         reason = data.get('reason', '').strip()
         
         if not reason:
-            return jsonify({'error': 'Reason is required'}), 400
+            return api_error('reason_required', 'Reason is required', 400)
         
         # Check rate limit
         if not db.check_rate_limit(current_user.id, request.remote_addr, 'endorsement', 10):
-            return jsonify({'error': 'Rate limit exceeded. Maximum 10 endorsements per day.'}), 429
+            return api_error('rate_limited', 'Rate limit exceeded. Maximum 10 endorsements per day.', 429)
         
         try:
             db.create_endorsement(current_user.id, user_id, reason)
-            return jsonify({'success': True, 'message': 'User endorsed successfully'})
+            return jsonify({'success': True, 'message': 'User endorsed successfully', 'code': 'user_endorsed'})
         except ValueError as e:
-            return jsonify({'error': str(e)}), 400
+            return api_error(_value_error_code(e), str(e), 400)
             
     except Exception as e:
         print(f"Error endorsing user: {e}")
-        return jsonify({'error': 'Failed to endorse user'}), 500
+        return api_error('server_error', 'Failed to endorse user', 500)
 
 # ========================================
 # Moderator Nomination Endpoints
@@ -1109,20 +1277,20 @@ def nominate_moderator_endpoint():
         reason = data.get('reason', '').strip()
         
         if not nominee_username or not reason:
-            return jsonify({'error': 'Nominee username and reason are required'}), 400
+            return api_error('nomination_fields_required', 'Nominee username and reason are required', 400)
         
         nominee = db.get_user_by_username(nominee_username)
         if not nominee:
-            return jsonify({'error': 'User not found'}), 404
+            return api_error('user_not_found', 'User not found', 404)
         
         if db.nominate_moderator(current_user.id, nominee['id'], reason):
-            return jsonify({'success': True, 'message': 'Nomination submitted for admin review'})
+            return jsonify({'success': True, 'message': 'Nomination submitted for admin review', 'code': 'nomination_submitted'})
         else:
-            return jsonify({'error': 'Failed to submit nomination'}), 500
+            return api_error('server_error', 'Failed to submit nomination', 500)
             
     except Exception as e:
         print(f"Error nominating moderator: {e}")
-        return jsonify({'error': 'Failed to nominate moderator'}), 500
+        return api_error('server_error', 'Failed to nominate moderator', 500)
 
 @app.route('/api/admin/nominations', methods=['GET'])
 @require_role('admin')
@@ -1143,12 +1311,13 @@ def review_nomination_endpoint(nomination_id):
         
         return jsonify({
             'success': True,
-            'message': 'Nomination approved' if approved else 'Nomination rejected'
+            'message': 'Nomination approved' if approved else 'Nomination rejected',
+            'code': 'nomination_approved' if approved else 'nomination_rejected',
         })
         
     except Exception as e:
         print(f"Error reviewing nomination: {e}")
-        return jsonify({'error': 'Failed to review nomination'}), 500
+        return api_error('server_error', 'Failed to review nomination', 500)
 
 
 # ========================================
@@ -1190,11 +1359,10 @@ def list_arguments_v1():
             'emoji': p.get('icon_emoji'),
         }
 
-    # Group counter-arguments by argument.
+    # Group counter-arguments by argument (public ones only: pending and
+    # rejected answers wait in the review queue).
     counters_by_arg = {}
-    for ca in store.get('counter_arguments', []) or []:
-        if not isinstance(ca, dict):
-            continue
+    for ca in argstore.published(store.get('counter_arguments')):
         aid = ca.get('argument_id')
         if isinstance(aid, int):
             counters_by_arg.setdefault(aid, []).append(ca)
@@ -1207,8 +1375,8 @@ def list_arguments_v1():
     }
 
     arguments = []
-    for a in store.get('arguments', []) or []:
-        if not isinstance(a, dict) or not isinstance(a.get('id'), int):
+    for a in argstore.published(store.get('arguments')):
+        if not isinstance(a.get('id'), int):
             continue
         text = a.get('text') or ''
         if q and q not in str(text).lower():
@@ -1308,8 +1476,8 @@ def get_argument_v1(argument_id: int):
     res_by_id = argstore.resources_by_id(store)
 
     arg = args_by_id.get(argument_id)
-    if not arg:
-        return jsonify({'error': 'Argument not found'}), 404
+    if not arg or not argstore.is_published(arg):
+        return api_error('claim_not_found', 'Argument not found', 404)
 
     def _resources_for(ca):
         """Resolve a debunk's resource_ids; fall back to legacy source_url."""
@@ -1343,18 +1511,19 @@ def get_argument_v1(argument_id: int):
         if not roleslib.has_sources(ca):
             return {'status': 'unsourced', 'count': 0, 'can_check': False, 'my_verdict': None}
         checks = checks_by_counter.get(ca.get('id'), [])
-        can_check, _reason = roleslib.can_check_source(viewer_id, viewer_role, ca, sourcer_ids)
+        can_check, refusal = roleslib.can_check_source(viewer_id, viewer_role, ca, sourcer_ids)
         summary = roleslib.source_status(checks, check_weights)
         return {
             'status': summary['status'],
             'count': summary['count'],
             'can_check': can_check,
+            'refusal_code': refusal,
             'my_verdict': next((sc['verdict'] for sc in checks if sc.get('user_id') == viewer_id), None),
         }
 
     counter_arguments = []
-    for ca in store.get('counter_arguments', []) or []:
-        if not isinstance(ca, dict) or ca.get('argument_id') != argument_id:
+    for ca in argstore.published(store.get('counter_arguments')):
+        if ca.get('argument_id') != argument_id:
             continue
 
         persona = None
@@ -1403,7 +1572,7 @@ def create_argument_v1():
     if tags is None:
         tags = []
     if not isinstance(tags, list):
-        return jsonify({'error': 'tags must be a list'}), 400
+        return api_error('tags_not_list', 'tags must be a list', 400)
 
     try:
         store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
@@ -1411,10 +1580,10 @@ def create_argument_v1():
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
         return jsonify({'success': True, 'argument': arg}), 201
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating argument: {e}")
-        return jsonify({'error': 'Failed to create argument'}), 500
+        return api_error('server_error', 'Failed to create argument', 500)
 
 
 @app.route('/api/persona-archetypes', methods=['GET'])
@@ -1434,20 +1603,20 @@ def create_counter_argument_v1():
     persona_id = data.get('persona_archetype_id')
 
     if not isinstance(argument_id, int):
-        return jsonify({'error': 'argument_id must be an integer'}), 400
+        return api_error('invalid_argument_id', 'argument_id must be an integer', 400)
     # A debunk targets exactly one persona.
     if not isinstance(persona_id, int):
-        return jsonify({'error': 'A target persona is required'}), 400
+        return api_error('persona_required', 'A target persona is required', 400)
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
     args_by_id, personas_by_id = argstore.build_indexes(store)
-    if argument_id not in args_by_id:
-        return jsonify({'error': 'Argument not found'}), 404
+    if not argstore.is_published(args_by_id.get(argument_id)):
+        return api_error('claim_not_found', 'Argument not found', 404)
     if persona_id not in personas_by_id:
-        return jsonify({'error': 'Persona archetype not found'}), 404
+        return api_error('persona_not_found', 'Persona archetype not found', 404)
     # Numbered EVS clusters are analysis placeholders, not targets for a response.
     if personas_by_id[persona_id].get('layer') == 'evs_cluster':
-        return jsonify({'error': 'Choose a named persona'}), 400
+        return api_error('persona_not_named', 'Choose a named persona', 400)
 
     # Collect source URLs from `sources` (list) and/or legacy `source_url`.
     raw_sources = []
@@ -1458,9 +1627,12 @@ def create_counter_argument_v1():
                 raw_sources.append(s.strip())
             elif isinstance(s, dict) and str(s.get('url') or '').strip():
                 raw_sources.append(str(s['url']).strip())
-    legacy = (data.get('source_url') or '').strip()
+    legacy = str(data.get('source_url') or '').strip()
     if legacy:
         raw_sources.append(legacy)
+    # Sources are optional, but every one given must be a real web link.
+    if any(not argstore.is_http_url(u) for u in raw_sources):
+        return api_error('invalid_url', f'Source: {argstore.URL_ERROR}', 400)
 
     # De-duplicate (case-insensitive), then resolve to first-class Resources.
     seen = set()
@@ -1497,10 +1669,10 @@ def create_counter_argument_v1():
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
         return jsonify({'success': True, 'counter_argument': counter}), 201
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating counter-argument: {e}")
-        return jsonify({'error': 'Failed to create counter-argument'}), 500
+        return api_error('server_error', 'Failed to create counter-argument', 500)
 
 
 # ========================================
@@ -1535,9 +1707,9 @@ def _record_pending_vote(kind, target_id, score, persona_id=None):
     )
     if not already:
         if len(pending) >= ANON_VOTES_PER_VISITOR:
-            return None, (jsonify({'error': 'Create a free account to keep voting.', 'needs_account': True}), 403)
+            return None, api_error('anon_vote_limit', 'Create a free account to keep voting.', 403, needs_account=True)
         if db.count_recent_pending_votes_by_ip(request.remote_addr) >= ANON_VOTES_PER_IP_PER_DAY:
-            return None, (jsonify({'error': 'Too many votes from this network today. Create a free account to keep voting.', 'needs_account': True}), 429)
+            return None, api_error('anon_votes_ip_limit', 'Too many votes from this network today. Create a free account to keep voting.', 429, needs_account=True)
     db.add_pending_vote(anon_id, kind, target_id, score, persona_id=persona_id, ip_address=request.remote_addr)
     return len(pending) + (0 if already else 1), None
 
@@ -1551,7 +1723,8 @@ def _claim_pending_votes(user_id):
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
     args_by_id, personas_by_id = argstore.build_indexes(store)
-    counter_ids = {c.get('id') for c in (store.get('counter_arguments') or []) if isinstance(c, dict)}
+    args_by_id = {k: v for k, v in args_by_id.items() if argstore.is_published(v)}
+    counter_ids = {c.get('id') for c in argstore.published(store.get('counter_arguments'))}
     # An account that already rated an answer keeps that rating (no stacking).
     already_rated = {
         (r.get('counter_argument_id'), r.get('persona_archetype_id'))
@@ -1595,22 +1768,22 @@ def create_effectiveness_rating_v1():
     score = data.get('score')
 
     if not isinstance(counter_argument_id, int):
-        return jsonify({'error': 'counter_argument_id must be an integer'}), 400
+        return api_error('invalid_counter_argument_id', 'counter_argument_id must be an integer', 400)
     if persona_id is not None and not isinstance(persona_id, int):
-        return jsonify({'error': 'persona_archetype_id must be an integer or null'}), 400
+        return api_error('invalid_persona_id', 'persona_archetype_id must be an integer or null', 400)
     if not isinstance(score, int):
-        return jsonify({'error': 'score must be an integer (1..5)'}), 400
+        return api_error('invalid_score', 'score must be an integer (1..5)', 400)
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
-    counter_ids = {c.get('id') for c in (store.get('counter_arguments', []) or []) if isinstance(c, dict) and isinstance(c.get('id'), int)}
+    counter_ids = {c.get('id') for c in argstore.published(store.get('counter_arguments')) if isinstance(c.get('id'), int)}
     persona_ids = {p.get('id') for p in (store.get('persona_archetypes', []) or []) if isinstance(p, dict) and isinstance(p.get('id'), int)}
 
     if counter_argument_id not in counter_ids:
-        return jsonify({'error': 'Counter-argument not found'}), 404
+        return api_error('answer_not_found', 'Counter-argument not found', 404)
     if persona_id is not None and persona_id not in persona_ids:
-        return jsonify({'error': 'Persona archetype not found'}), 404
+        return api_error('persona_not_found', 'Persona archetype not found', 404)
     if not 1 <= score <= 5:
-        return jsonify({'error': 'Score must be an integer between 1 and 5'}), 400
+        return api_error('invalid_score', 'Score must be an integer between 1 and 5', 400)
 
     if not current_user.is_authenticated:
         pending_count, error = _record_pending_vote('effectiveness', counter_argument_id, score, persona_id)
@@ -1629,10 +1802,10 @@ def create_effectiveness_rating_v1():
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
         return jsonify({'success': True, 'rating': rating}), 201
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating rating: {e}")
-        return jsonify({'error': 'Failed to create rating'}), 500
+        return api_error('server_error', 'Failed to create rating', 500)
 
 # ========================================
 # Resource library
@@ -1647,8 +1820,6 @@ def _build_resource_library():
         gallery_seeds=(
             (load_json_file(GALLERY_FILE, []) or []) + (load_json_file(BONPOTE_GALLERY_FILE, []) or [])
         ),
-        submissions=load_json_file(SUBMISSIONS_FILE, []),
-        contributions=load_json_file(CONTRIBUTIONS_FILE, []),
         reviews=library.load_reviews(RESOURCE_REVIEWS_FILE),
         resolve_user=db.get_user_by_id,
     )
@@ -1714,11 +1885,9 @@ def get_resource_library():
 
 
 @app.route('/api/admin/library', methods=['GET'])
+@require_admin
 def get_admin_resource_library():
     """Every resource with its review state — the admin's review queue."""
-    if not _is_valid_admin_token(request):
-        return jsonify({'error': 'Unauthorized'}), 401
-
     entries = _build_resource_library()
     status_filter = (request.args.get('status') or '').strip().lower()
     if status_filter:
@@ -1737,20 +1906,18 @@ def get_admin_resource_library():
 
 
 @app.route('/api/admin/library/review', methods=['POST'])
+@require_admin
 def review_resource():
     """Approve or reject a resource, optionally correcting its categorisation."""
-    if not _is_valid_admin_token(request):
-        return jsonify({'error': 'Unauthorized'}), 401
-
     data = request.get_json() or {}
     url = (data.get('url') or '').strip()
     status = (data.get('status') or '').strip().lower()
     topics = data.get('topics')
 
     if not url:
-        return jsonify({'error': 'A resource URL is required'}), 400
+        return api_error('url_required', 'A resource URL is required', 400)
     if topics is not None and not isinstance(topics, list):
-        return jsonify({'error': 'topics must be a list'}), 400
+        return api_error('topics_not_list', 'topics must be a list', 400)
 
     try:
         reviews = library.load_reviews(RESOURCE_REVIEWS_FILE)
@@ -1769,10 +1936,10 @@ def review_resource():
         )
         library.save_reviews(RESOURCE_REVIEWS_FILE, reviews)
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error reviewing resource: {e}")
-        return jsonify({'error': 'Failed to save review'}), 500
+        return api_error('server_error', 'Failed to save review', 500)
 
     key = library.entry_key(url)
     updated = next((e for e in _build_resource_library() if e['id'] == library.entry_id(key)), None)
@@ -1790,16 +1957,16 @@ def create_importance_rating_v1():
     score = data.get('score')
 
     if not isinstance(argument_id, int):
-        return jsonify({'error': 'argument_id must be an integer'}), 400
+        return api_error('invalid_argument_id', 'argument_id must be an integer', 400)
     if not isinstance(score, int):
-        return jsonify({'error': 'score must be an integer (1..5)'}), 400
+        return api_error('invalid_score', 'score must be an integer (1..5)', 400)
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
     args_by_id, _personas_by_id = argstore.build_indexes(store)
-    if argument_id not in args_by_id:
-        return jsonify({'error': 'Argument not found'}), 404
+    if not argstore.is_published(args_by_id.get(argument_id)):
+        return api_error('claim_not_found', 'Argument not found', 404)
     if not 1 <= score <= 5:
-        return jsonify({'error': 'Score must be an integer between 1 and 5'}), 400
+        return api_error('invalid_score', 'Score must be an integer between 1 and 5', 400)
 
     if not current_user.is_authenticated:
         pending_count, error = _record_pending_vote('importance', argument_id, score)
@@ -1841,10 +2008,10 @@ def create_importance_rating_v1():
             },
         }), 201
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating importance rating: {e}")
-        return jsonify({'error': 'Failed to save importance rating'}), 500
+        return api_error('server_error', 'Failed to save importance rating', 500)
 
 
 @app.route('/api/resources', methods=['POST'])
@@ -1863,20 +2030,20 @@ def create_resource_v1():
     argument_id = data.get('argument_id')
 
     if not url:
-        return jsonify({'error': 'A resource URL is required'}), 400
-    if not url.lower().startswith(('http://', 'https://')):
-        return jsonify({'error': 'The URL must start with http:// or https://'}), 400
+        return api_error('url_required', 'A resource URL is required', 400)
+    if not argstore.is_http_url(url):
+        return api_error('invalid_url', argstore.URL_ERROR, 400)
     if tags is None:
         tags = []
     if not isinstance(tags, list):
-        return jsonify({'error': 'tags must be a list'}), 400
+        return api_error('tags_not_list', 'tags must be a list', 400)
     if argument_id is not None and not isinstance(argument_id, int):
-        return jsonify({'error': 'argument_id must be an integer or null'}), 400
+        return api_error('invalid_argument_id', 'argument_id must be an integer or null', 400)
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
     args_by_id, _personas_by_id = argstore.build_indexes(store)
     if argument_id is not None and argument_id not in args_by_id:
-        return jsonify({'error': 'Argument not found'}), 404
+        return api_error('claim_not_found', 'Argument not found', 404)
 
     try:
         resource = argstore.upsert_resource(
@@ -1894,10 +2061,10 @@ def create_resource_v1():
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
         return jsonify({'success': True, 'resource': resource}), 201
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating resource: {e}")
-        return jsonify({'error': 'Failed to save resource'}), 500
+        return api_error('server_error', 'Failed to save resource', 500)
 
 
 # ========================================
@@ -1925,9 +2092,9 @@ def take_role():
     """Declare a role. You start as an apprentice; your work confirms you."""
     role = ((request.get_json() or {}).get('role') or '').strip()
     if role not in roleslib.ROLE_CATALOG:
-        return jsonify({'error': 'Unknown role'}), 400
+        return api_error('unknown_role', 'Unknown role', 400)
     if not db.add_user_role(current_user.id, role):
-        return jsonify({'error': 'You already hold this role'}), 409
+        return api_error('role_already_held', 'You already hold this role', 409)
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
     return jsonify({'success': True, 'roles': roleslib.describe_roles(store, current_user.id)}), 201
@@ -1938,7 +2105,7 @@ def take_role():
 def drop_role(role):
     """Step down from a role. Your past work still counts if you take it again."""
     if not db.remove_user_role(current_user.id, role):
-        return jsonify({'error': 'You don’t hold this role'}), 404
+        return api_error('role_not_held', 'You don’t hold this role', 404)
     return jsonify({'success': True})
 
 
@@ -1972,24 +2139,24 @@ def check_counter_argument_sources(counter_argument_id: int):
     note = (data.get('note') or '').strip()[:500]
 
     store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
-    ca = next((c for c in store.get('counter_arguments', []) or []
-               if isinstance(c, dict) and c.get('id') == counter_argument_id), None)
+    ca = next((c for c in argstore.published(store.get('counter_arguments'))
+               if c.get('id') == counter_argument_id), None)
     if not ca:
-        return jsonify({'error': 'Counter-argument not found'}), 404
+        return api_error('answer_not_found', 'Counter-argument not found', 404)
 
-    allowed, reason = roleslib.can_check_source(
+    allowed, refusal = roleslib.can_check_source(
         current_user.id, current_user.role, ca, set(db.get_role_tiers('sourcer')))
     if not allowed:
-        return jsonify({'error': reason}), 403
+        return api_error(refusal, roleslib.CHECK_REFUSALS.get(refusal, 'Not allowed'), 403)
 
     if not db.check_rate_limit(current_user.id, request.remote_addr, 'source_check', 50):
-        return jsonify({'error': 'Rate limit exceeded. Maximum 50 source checks per day.'}), 429
+        return api_error('rate_limited', 'Rate limit exceeded. Maximum 50 source checks per day.', 429)
 
     try:
         argstore.set_source_check(store, counter_argument_id=counter_argument_id,
                                   verdict=verdict, user_id=current_user.id, note=note)
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return api_error(_value_error_code(e), str(e), 400)
 
     weights = roleslib.check_weights()
     payouts = roleslib.settle_source_rewards(store, ca, weights)
@@ -2016,15 +2183,13 @@ if __name__ == '__main__':
     # Initialize data files if they don't exist
     if not os.path.exists(RESOURCES_FILE):
         save_json_file(RESOURCES_FILE, [])
-    if not os.path.exists(CONTRIBUTIONS_FILE):
-        save_json_file(CONTRIBUTIONS_FILE, [])
-    if not os.path.exists(SUBMISSIONS_FILE):
-        save_json_file(SUBMISSIONS_FILE, [])
     if not os.path.exists(ARGUMENTATION_FILE):
         argstore.save_store(ARGUMENTATION_FILE, argstore.default_store(), PERSONA_ARCHETYPES_FILE)
     
     # Production-safety warnings: never ship with the committed defaults.
     if app.secret_key == 'dev-secret-key-change-in-production':
+        if ENV == 'production':
+            raise SystemExit('Refusing to start with ENV=production and the default SECRET_KEY.')
         print('WARNING: using the default SECRET_KEY. Set SECRET_KEY in the environment before deploying.')
     if ADMIN_PASSWORD == 'change_me_in_production':
         print('WARNING: using the default ADMIN_PASSWORD. Set ADMIN_PASSWORD in the environment before deploying.')

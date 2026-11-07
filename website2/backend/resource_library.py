@@ -460,13 +460,22 @@ def build_library(
     uses_by_id: Dict[int, int] = {}
     uses_by_key: Dict[str, int] = {}
     args_by_resource: Dict[int, List[int]] = {}
+    # When a source was first cited: older than the Resource record itself for
+    # links backfilled from existing answers.
+    first_use_by_id: Dict[int, str] = {}
     for ca in (store.get("counter_arguments") or []):
         if not isinstance(ca, dict):
             continue
+        # Answers still in review (or rejected) don't count as uses.
+        if ca.get("status") not in (None, "published"):
+            continue
         argument_id = ca.get("argument_id")
+        ca_created = _clean(ca.get("created_at"))
         for rid in (ca.get("resource_ids") or []):
             if isinstance(rid, int):
                 uses_by_id[rid] = uses_by_id.get(rid, 0) + 1
+                if ca_created and (rid not in first_use_by_id or ca_created < first_use_by_id[rid]):
+                    first_use_by_id[rid] = ca_created
                 if isinstance(argument_id, int):
                     args_by_resource.setdefault(rid, []).append(argument_id)
         legacy = entry_key(ca.get("source_url") or "")
@@ -491,12 +500,16 @@ def build_library(
 
         entry.fill("title", _clean(resource.get("title")))
         entry.fill("description", _clean(resource.get("description")))
-        entry.fill("submitted_at", _clean(resource.get("created_at")))
+        rid = resource.get("id")
+        created = _clean(resource.get("created_at"))
+        first_use = first_use_by_id.get(rid) if isinstance(rid, int) else None
+        if first_use and (not created or first_use < created):
+            created = first_use
+        entry.fill("submitted_at", created)
         entry.add_topics(_tags(resource.get("tags")))
         if entry["submitted_by"] is None:
             entry["submitted_by"] = user_brief(resource.get("created_by_user_id"))
 
-        rid = resource.get("id")
         linked = list(resource.get("argument_ids") or [])
         if isinstance(rid, int):
             entry["used_in_responses"] += uses_by_id.get(rid, 0)

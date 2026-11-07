@@ -47,7 +47,7 @@ def main():
     import database as db
     db.DATABASE_PATH = os.path.join(DATA, 'users.db')
     import app as site
-    for name in ('RESOURCES_FILE', 'CONTRIBUTIONS_FILE', 'SUBMISSIONS_FILE', 'GALLERY_FILE',
+    for name in ('RESOURCES_FILE', 'GALLERY_FILE',
                  'BONPOTE_GALLERY_FILE', 'ARGUMENTATION_FILE', 'PERSONA_ARCHETYPES_FILE',
                  'RESOURCE_REVIEWS_FILE'):
         setattr(site, name, os.path.join(DATA, os.path.basename(getattr(site, name))))

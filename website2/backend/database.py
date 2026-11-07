@@ -459,17 +459,25 @@ def check_rate_limit(user_id, ip_address, action_type, limit):
         WHERE datetime(window_start) < datetime('now', '-1 day')
     ''')
     
-    # Check current count
-    identifier = user_id if user_id else ip_address
-    cursor.execute('''
-        SELECT action_count FROM rate_limits
-        WHERE (user_id = ? OR ip_address = ?)
-        AND action_type = ?
-        AND datetime(window_start) >= datetime('now', '-1 day')
-    ''', (user_id, ip_address, action_type))
-    
+    # Check current count. Each call lands in its own row (window_start is the
+    # call's timestamp), so the count over the last day is the SUM — reading a
+    # single row meant no limit ever triggered. Signed-in callers are counted
+    # per account; anonymous ones per IP.
+    if user_id:
+        cursor.execute('''
+            SELECT COALESCE(SUM(action_count), 0) FROM rate_limits
+            WHERE user_id = ? AND action_type = ?
+            AND datetime(window_start) >= datetime('now', '-1 day')
+        ''', (user_id, action_type))
+    else:
+        cursor.execute('''
+            SELECT COALESCE(SUM(action_count), 0) FROM rate_limits
+            WHERE user_id IS NULL AND ip_address = ? AND action_type = ?
+            AND datetime(window_start) >= datetime('now', '-1 day')
+        ''', (ip_address, action_type))
+
     result = cursor.fetchone()
-    
+
     if result and result[0] >= limit:
         conn.close()
         return False

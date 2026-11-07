@@ -49,13 +49,6 @@ def _get_str(d: Dict[str, Any], key: str) -> Optional[str]:
     return s or None
 
 
-def _contrib_dedupe_key(c: Dict[str, Any]) -> Tuple[str, str, str]:
-    narrative = argstore.normalize_text(str(c.get("narrative") or "")).lower()
-    counter = argstore.normalize_text(str(c.get("counter_argument") or "")).lower()
-    source = str(c.get("source") or "").strip()
-    return (narrative, counter, source)
-
-
 def load_narratifs(path: str) -> List[Dict[str, Any]]:
     data = argstore.load_json_file(path, [])
     if not isinstance(data, list):
@@ -76,7 +69,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Import the 19 Science Feedback 'narratifs' JSON into the argumentation store "
-            "(arguments + counter-arguments) and also seed contributions.json."
+            "(arguments + counter-arguments)."
         )
     )
 
@@ -99,14 +92,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Persona sidecar path.",
     )
     parser.add_argument(
-        "--contributions",
-        default=os.path.join(data_dir, "contributions.json"),
-        help="Contributions JSON path.",
-    )
-    parser.add_argument(
         "--source-url",
         default=DEFAULT_SOURCE_URL,
-        help="Source URL to store on counter-arguments / contributions.",
+        help="Source URL to store on counter-arguments.",
     )
     parser.add_argument(
         "--use-full-debunk",
@@ -132,21 +120,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     store = argstore.load_store(args.argumentation, args.personas)
 
-    contributions: List[Dict[str, Any]] = argstore.load_json_file(args.contributions, [])
-    if not isinstance(contributions, list):
-        contributions = []
-
-    existing_contrib_keys = set()
-    next_contrib_id = 1
-    for c in contributions:
-        if isinstance(c, dict):
-            existing_contrib_keys.add(_contrib_dedupe_key(c))
-            if isinstance(c.get("id"), int):
-                next_contrib_id = max(next_contrib_id, int(c["id"]) + 1)
-
     imported_args = 0
     imported_counters = 0
-    imported_contribs = 0
     skipped = 0
 
     for row in narratifs:
@@ -208,46 +183,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         if ca:
             imported_counters += 1
 
-        # Also seed the older contributions feed
-        title_prefix = f"SF narratif {number_int:02d}: " if isinstance(number_int, int) else "SF narratif: "
-        title = _shorten(title_prefix + claim, 90)
-        contrib = {
-            "id": next_contrib_id,
-            "title": title or f"Contribution #{next_contrib_id}",
-            "narrative": claim,
-            "counter_argument": counter_text,
-            "tags": tags,
-            "source": args.source_url,
-            "date": _now_iso(),
-            "imported_from": imported_from,
-        }
-
-        key = _contrib_dedupe_key(contrib)
-        if key not in existing_contrib_keys:
-            contributions.append(contrib)
-            existing_contrib_keys.add(key)
-            next_contrib_id += 1
-            imported_contribs += 1
-
     if args.dry_run:
         print("Dry run: no files written")
         print(f"Would process rows: {len(narratifs)}")
         print(f"Would import arguments (upsert calls): {imported_args}")
         print(f"Would import counter-arguments (create calls): {imported_counters}")
-        print(f"Would add contributions: {imported_contribs}")
         print(f"Would skip rows (missing claim/debunk): {skipped}")
         return 0
 
     argstore.save_store(args.argumentation, store, args.personas)
-    argstore.save_json_file(args.contributions, contributions)
 
     print(f"Processed rows: {len(narratifs)}")
     print(f"Upserted arguments: {imported_args}")
     print(f"Created counter-arguments: {imported_counters}")
-    print(f"Added contributions: {imported_contribs}")
     print(f"Skipped rows (missing claim/debunk): {skipped}")
     print(f"Wrote store: {args.argumentation}")
-    print(f"Wrote contributions: {args.contributions}")
     return 0
 
 
