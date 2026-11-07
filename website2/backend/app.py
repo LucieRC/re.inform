@@ -237,10 +237,12 @@ def register():
             user_dict = db.get_user_by_id(user_id)
             user = User(user_dict)
             login_user(user, remember=True)
-            
+            claimed_votes = _claim_pending_votes(user.id)
+
             return jsonify({
                 'success': True,
                 'message': 'Registration successful',
+                'claimed_votes': claimed_votes,
                 'user': {
                     'id': user.id,
                     'username': user.username,
@@ -283,10 +285,12 @@ def login():
         # Login user
         user = User(user_dict)
         login_user(user, remember=remember)
-        
+        claimed_votes = _claim_pending_votes(user.id)
+
         return jsonify({
             'success': True,
             'message': 'Login successful',
+            'claimed_votes': claimed_votes,
             'user': {
                 'id': user.id,
                 'username': user.username,
@@ -324,7 +328,7 @@ def get_current_user():
                 'avatar_url': avatar_url
             }
         })
-    return jsonify({'authenticated': False})
+    return jsonify({'authenticated': False, 'pending_votes': len(db.get_pending_votes(_anon_id()))})
 
 
 def _user_avatar_url(user_dict):
@@ -1198,6 +1202,9 @@ def list_arguments_v1():
     # Importance ratings are cast on the claim itself: how urgent is this to debunk?
     importance_by_arg = argstore.importance_by_argument(store)
     viewer_id = current_user.id if current_user.is_authenticated else None
+    pending_importance = {} if viewer_id is not None else {
+        v['target_id']: v['score'] for v in db.get_pending_votes(_anon_id()) if v['kind'] == 'importance'
+    }
 
     arguments = []
     for a in store.get('arguments', []) or []:
@@ -1262,7 +1269,7 @@ def list_arguments_v1():
         importance_scores = [int(ir['score']) for ir in importance]
         my_importance = next(
             (int(ir['score']) for ir in importance if viewer_id is not None and ir.get('user_id') == viewer_id),
-            None,
+            pending_importance.get(a['id']),
         )
 
         arguments.append({
@@ -1496,8 +1503,91 @@ def create_counter_argument_v1():
         return jsonify({'error': 'Failed to create counter-argument'}), 500
 
 
+# ========================================
+# Votes before signing up
+# ========================================
+# Rating takes one tap and no account. A visitor's votes are kept as pending,
+# keyed by a random id in their session cookie, and don't count anywhere until
+# they register or log in — then they become that user's own ratings. So
+# clearing cookies to vote again gains nothing.
+
+ANON_VOTES_PER_VISITOR = 100
+ANON_VOTES_PER_IP_PER_DAY = 300
+
+
+def _anon_id(create=False):
+    """This visitor's anonymous id, minted on their first vote."""
+    anon_id = session.get('anon_id')
+    if not anon_id and create:
+        anon_id = secrets.token_urlsafe(16)
+        session['anon_id'] = anon_id
+        session.permanent = True  # survive closing the browser
+    return anon_id
+
+
+def _record_pending_vote(kind, target_id, score, persona_id=None):
+    """Save an anonymous vote. Returns (pending_count, error_response)."""
+    anon_id = _anon_id(create=True)
+    pending = db.get_pending_votes(anon_id)
+    already = any(
+        v['kind'] == kind and v['target_id'] == target_id and v['persona_id'] == persona_id
+        for v in pending
+    )
+    if not already:
+        if len(pending) >= ANON_VOTES_PER_VISITOR:
+            return None, (jsonify({'error': 'Create a free account to keep voting.', 'needs_account': True}), 403)
+        if db.count_recent_pending_votes_by_ip(request.remote_addr) >= ANON_VOTES_PER_IP_PER_DAY:
+            return None, (jsonify({'error': 'Too many votes from this network today. Create a free account to keep voting.', 'needs_account': True}), 429)
+    db.add_pending_vote(anon_id, kind, target_id, score, persona_id=persona_id, ip_address=request.remote_addr)
+    return len(pending) + (0 if already else 1), None
+
+
+def _claim_pending_votes(user_id):
+    """Turn this session's pending votes into the user's own. Returns how many counted."""
+    anon_id = session.pop('anon_id', None)
+    votes = db.get_pending_votes(anon_id)
+    if not votes:
+        return 0
+
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    args_by_id, personas_by_id = argstore.build_indexes(store)
+    counter_ids = {c.get('id') for c in (store.get('counter_arguments') or []) if isinstance(c, dict)}
+    # An account that already rated an answer keeps that rating (no stacking).
+    already_rated = {
+        (r.get('counter_argument_id'), r.get('persona_archetype_id'))
+        for r in (store.get('ratings') or [])
+        if isinstance(r, dict) and r.get('user_id') == user_id
+    }
+
+    claimed = 0
+    for v in votes:
+        try:
+            if v['kind'] == 'importance' and v['target_id'] in args_by_id:
+                argstore.set_importance_rating(store, argument_id=v['target_id'], score=v['score'], user_id=user_id)
+                claimed += 1
+            elif v['kind'] == 'effectiveness' and v['target_id'] in counter_ids:
+                persona_id = v['persona_id'] if v['persona_id'] in personas_by_id else None
+                if (v['target_id'], persona_id) in already_rated:
+                    continue
+                argstore.create_rating(
+                    store,
+                    counter_argument_id=v['target_id'],
+                    persona_archetype_id=persona_id,
+                    score=v['score'],
+                    user_id=user_id,
+                )
+                already_rated.add((v['target_id'], persona_id))
+                claimed += 1
+        except ValueError:
+            continue  # a vote that's no longer valid is simply dropped
+
+    if claimed:
+        argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
+    db.delete_pending_votes(anon_id)
+    return claimed
+
+
 @app.route('/api/effectiveness-ratings', methods=['POST'])
-@login_required
 def create_effectiveness_rating_v1():
     data = request.get_json() or {}
     counter_argument_id = data.get('counter_argument_id')
@@ -1519,6 +1609,14 @@ def create_effectiveness_rating_v1():
         return jsonify({'error': 'Counter-argument not found'}), 404
     if persona_id is not None and persona_id not in persona_ids:
         return jsonify({'error': 'Persona archetype not found'}), 404
+    if not 1 <= score <= 5:
+        return jsonify({'error': 'Score must be an integer between 1 and 5'}), 400
+
+    if not current_user.is_authenticated:
+        pending_count, error = _record_pending_vote('effectiveness', counter_argument_id, score, persona_id)
+        if error:
+            return error
+        return jsonify({'success': True, 'pending': True, 'pending_count': pending_count}), 202
 
     try:
         rating = argstore.create_rating(
@@ -1682,7 +1780,6 @@ def review_resource():
 
 
 @app.route('/api/importance-ratings', methods=['POST'])
-@login_required
 def create_importance_rating_v1():
     """Rate how urgent a claim is to debunk (1..5).
 
@@ -1701,6 +1798,25 @@ def create_importance_rating_v1():
     args_by_id, _personas_by_id = argstore.build_indexes(store)
     if argument_id not in args_by_id:
         return jsonify({'error': 'Argument not found'}), 404
+    if not 1 <= score <= 5:
+        return jsonify({'error': 'Score must be an integer between 1 and 5'}), 400
+
+    if not current_user.is_authenticated:
+        pending_count, error = _record_pending_vote('importance', argument_id, score)
+        if error:
+            return error
+        # Public tally is unchanged: pending votes don't count until claimed.
+        scores = [int(ir['score']) for ir in argstore.importance_by_argument(store).get(argument_id, [])]
+        return jsonify({
+            'success': True,
+            'pending': True,
+            'pending_count': pending_count,
+            'importance': {
+                'avg_score': (sum(scores) / len(scores)) if scores else None,
+                'count': len(scores),
+                'my_score': score,
+            },
+        }), 202
 
     try:
         rating = argstore.set_importance_rating(

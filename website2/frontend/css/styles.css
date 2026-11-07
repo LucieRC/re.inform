@@ -3818,7 +3818,7 @@ button.feed-composer {
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.priority-btn:hover:not(:disabled) {
+.priority-btn:hover:not(:disabled):not(.is-selected) {
     border-color: var(--primary-color);
     color: var(--primary-color);
 }

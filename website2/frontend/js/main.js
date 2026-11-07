@@ -13,6 +13,8 @@ const API_BASE_URL = /^https?:$/.test(window.location.protocol)
 
 // Current user state
 let currentUser = null;
+// Votes this visitor cast before having an account (they count once they sign up).
+let pendingVotes = 0;
 
 // ========================================
 // Icons: monochrome line icons (inline SVG, currentColor) used instead of emoji
@@ -343,6 +345,7 @@ async function checkAuthState() {
             updateNavForLoggedInUser();
         } else {
             currentUser = null;
+            pendingVotes = data.pending_votes || 0;
             updateNavForLoggedOutUser();
         }
     } catch (error) {
@@ -416,6 +419,16 @@ async function logout() {
 // Login Page
 // ========================================
 
+// Votes cast without an account are kept until the visitor signs up.
+function pendingVotesHtml(count) {
+    const n = Math.max(1, count || 1);
+    return `Vote saved. <a href="${authHref('register.html')}">Create a free account</a> and your ${n} vote${n === 1 ? '' : 's'} will count.`;
+}
+
+function claimedVotesText(count) {
+    return count ? ` Your ${count} vote${count === 1 ? ' now counts' : 's now count'}.` : '';
+}
+
 // After login/register, return to the page that asked for an account.
 // Only same-site relative pages are accepted, so `next` can't redirect off-site.
 function postAuthDestination() {
@@ -436,6 +449,14 @@ function initLoginPage() {
 
     // Keep the return destination when switching between login and register.
     document.querySelectorAll('a[href="register.html"]').forEach((a) => { a.href = `register.html${window.location.search}`; });
+
+    if (pendingVotes) {
+        const note = document.getElementById('formMessage');
+        if (note) {
+            note.textContent = `You have ${pendingVotes} vote${pendingVotes === 1 ? '' : 's'} waiting: ${pendingVotes === 1 ? 'it counts' : 'they count'} as soon as you log in.`;
+            note.className = 'form-message success';
+        }
+    }
     
     // Redirect if already logged in
     if (currentUser) {
@@ -466,11 +487,11 @@ function initLoginPage() {
             const data = await response.json();
             
             if (response.ok) {
-                formMessage.textContent = 'Login successful! Redirecting...';
+                formMessage.textContent = `Login successful!${claimedVotesText(data.claimed_votes)} Redirecting...`;
                 formMessage.className = 'form-message success';
                 setTimeout(() => {
                     window.location.href = postAuthDestination();
-                }, 1000);
+                }, data.claimed_votes ? 1800 : 1000);
             } else {
                 formMessage.textContent = data.error || 'Login failed';
                 formMessage.className = 'form-message error';
@@ -496,6 +517,14 @@ function initRegisterPage() {
 
     // Keep the return destination when switching between login and register.
     document.querySelectorAll('a[href="login.html"]').forEach((a) => { a.href = `login.html${window.location.search}`; });
+
+    if (pendingVotes) {
+        const note = document.getElementById('formMessage');
+        if (note) {
+            note.textContent = `You have ${pendingVotes} vote${pendingVotes === 1 ? '' : 's'} waiting: ${pendingVotes === 1 ? 'it counts' : 'they count'} as soon as you sign up.`;
+            note.className = 'form-message success';
+        }
+    }
     
     // Redirect if already logged in
     if (currentUser) {
@@ -534,11 +563,11 @@ function initRegisterPage() {
             const data = await response.json();
             
             if (response.ok) {
-                formMessage.textContent = 'Account created! Redirecting...';
+                formMessage.textContent = `Account created!${claimedVotesText(data.claimed_votes)} Redirecting...`;
                 formMessage.className = 'form-message success';
                 setTimeout(() => {
                     window.location.href = postAuthDestination();
-                }, 1000);
+                }, data.claimed_votes ? 1800 : 1000);
             } else {
                 formMessage.textContent = data.error || 'Registration failed';
                 formMessage.className = 'form-message error';
@@ -1494,8 +1523,8 @@ const CONTRIBUTOR_PROFILES = [
 // `open` reveals a workspace on this page; `href` (or `hrefFrom`, computed once
 // claims are loaded) leads to where the work happens.
 const CONTRIBUTOR_TASKS = {
-    prioritize: { icon: 'target', title: 'Vote on the claims you hear most', desc: 'One tap per claim. It decides what gets answered first.', time: '1 min', account: true, open: 'ws-prioritize' },
-    rate: { icon: 'star', title: 'Rate an answer', desc: 'Read a response and say whether it would convince the person it targets.', time: '30 sec', account: true, hrefFrom: 'unrated' },
+    prioritize: { icon: 'target', title: 'Vote on the claims you hear most', desc: 'One tap per claim. It decides what gets answered first.', time: '1 min', account: false, open: 'ws-prioritize' },
+    rate: { icon: 'star', title: 'Rate an answer', desc: 'Read a response and say whether it would convince the person it targets.', time: '30 sec', account: false, hrefFrom: 'unrated' },
     claim: { icon: 'plus', title: "Add a claim you've heard", desc: 'Just the sentence. No source or answer needed.', time: '1 min', account: true, open: 'ws-claim' },
     answer: { icon: 'message', title: 'Answer a claim for a specific person', desc: 'Pick a claim and a persona that has no answer yet. A few sentences are enough.', time: '5 min', account: true, open: 'ws-answer' },
     personas: { icon: 'users', title: 'Get to know the personas', desc: 'Five kinds of people you may talk to, and what moves each of them.', time: '5 min', account: false, href: 'personalities.html' },
@@ -1619,9 +1648,11 @@ function openContributorTask(taskId) {
     // Logged out: say so up front, with a way back to exactly this task.
     const hint = ws.querySelector('.onb-login-hint');
     if (hint) {
-        hint.innerHTML = currentUser ? '' : `
+        hint.innerHTML = currentUser ? '' : task.account ? `
             <p class="onb-account onb-account-inline">You'll need a free account to save this.
-                <a href="${authHref('register.html')}">Create one</a> or <a href="${authHref('login.html')}">log in</a> — you'll come back right here.</p>`;
+                <a href="${authHref('register.html')}">Create one</a> or <a href="${authHref('login.html')}">log in</a> — you'll come back right here.</p>` : `
+            <p class="onb-account onb-account-inline">No account needed to vote. Your votes are saved, and they count once you
+                <a href="${authHref('register.html')}">create a free account</a>.</p>`;
     }
 
     syncContributeUrl();
@@ -1858,16 +1889,12 @@ function renderPriorityList(args) {
 
 async function submitImportanceRating(row, score) {
     const messageEl = document.getElementById('priorityMessage');
-    const showMessage = (text, type) => {
+    const showMessage = (text, type, html = false) => {
         if (!messageEl) return;
-        messageEl.textContent = text;
+        if (html) messageEl.innerHTML = text;
+        else messageEl.textContent = text;
         messageEl.className = `form-message ${type}`;
     };
-
-    if (!currentUser) {
-        showMessage('Please log in to rate which claims matter most.', 'error');
-        return;
-    }
 
     const argumentId = Number(row.dataset.argumentId);
     const buttons = Array.from(row.querySelectorAll('.priority-btn'));
@@ -1883,7 +1910,8 @@ async function submitImportanceRating(row, score) {
         const data = await response.json();
 
         if (!response.ok) {
-            showMessage(data.error || 'Could not save your rating.', 'error');
+            const signup = data.needs_account ? ` <a href="${authHref('register.html')}">Create a free account</a>` : '';
+            showMessage(escapeHtml(data.error || 'Could not save your rating.') + signup, 'error', true);
             return;
         }
 
@@ -1901,7 +1929,12 @@ async function submitImportanceRating(row, score) {
                 ? `${count} rating${count === 1 ? '' : 's'} · avg ${Number(avg).toFixed(1)}/5`
                 : 'No ratings yet';
         }
-        showMessage('Thanks — your rating helps set the priorities.', 'success');
+        if (data.pending) {
+            pendingVotes = data.pending_count;
+            showMessage(pendingVotesHtml(data.pending_count), 'success', true);
+        } else {
+            showMessage('Thanks — your rating helps set the priorities.', 'success');
+        }
     } catch (error) {
         console.error('Importance rating error:', error);
         showMessage('Could not reach the server. Please try again.', 'error');
@@ -3336,10 +3369,6 @@ function highlightStars(starWrap, upTo) {
 }
 
 async function submitRating(counterArgumentId, personaId, score, rateRow) {
-    if (!currentUser) {
-        showToast('Log in to rate a response.', { actionLabel: 'Log in', actionHref: authHref() });
-        return;
-    }
     try {
         const body = { counter_argument_id: counterArgumentId, score };
         if (personaId !== '' && personaId != null) body.persona_archetype_id = Number(personaId);
@@ -3353,7 +3382,16 @@ async function submitRating(counterArgumentId, personaId, score, rateRow) {
         const data = await res.json();
         if (res.ok) {
             rateRow.innerHTML = `<span class="rate-thanks">Thanks — rated ${score}★</span>`;
-            showToast('Rating saved. Have you tried this one for real?');
+            if (data.pending) {
+                pendingVotes = data.pending_count;
+                const n = data.pending_count;
+                showToast(`Vote saved. Create a free account and your ${n} vote${n === 1 ? '' : 's'} will count.`,
+                    { actionLabel: 'Create account', actionHref: authHref('register.html'), duration: 8000 });
+            } else {
+                showToast('Rating saved. Have you tried this one for real?');
+            }
+        } else if (data.needs_account) {
+            showToast(data.error, { actionLabel: 'Create account', actionHref: authHref('register.html'), duration: 8000 });
         } else {
             showToast(data.error || 'Could not save rating.');
         }

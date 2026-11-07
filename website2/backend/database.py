@@ -157,6 +157,25 @@ def init_db():
         )
     ''')
 
+    # Votes cast before signing up, keyed by an anonymous session id. They
+    # don't count anywhere until claimed: on register/login they become the
+    # user's own ratings (see _claim_pending_votes in app.py), then these rows
+    # are deleted.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pending_votes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anon_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            persona_id INTEGER,
+            score INTEGER NOT NULL,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pending_votes_anon ON pending_votes(anon_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pending_votes_ip ON pending_votes(ip_address, created_at)')
+
     conn.commit()
     conn.close()
     print(f"Database initialized at {DATABASE_PATH}")
@@ -717,3 +736,75 @@ def get_user_ids_by_site_role(*site_roles):
 
 if __name__ == '__main__':
     init_db()
+
+
+# ========================================
+# Pending votes (cast before signing up)
+# ========================================
+
+PENDING_VOTE_KINDS = ('importance', 'effectiveness')
+PENDING_VOTE_TTL_DAYS = 30
+
+
+def add_pending_vote(anon_id, kind, target_id, score, persona_id=None, ip_address=None):
+    """Store a vote from a visitor without an account.
+
+    A visitor re-voting on the same thing replaces their previous vote, so
+    pending votes can't stack. Votes older than the TTL are dropped.
+    """
+    if kind not in PENDING_VOTE_KINDS:
+        raise ValueError(f'Unknown vote kind: {kind}')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM pending_votes WHERE datetime(created_at) < datetime('now', ?)",
+        (f'-{PENDING_VOTE_TTL_DAYS} days',),
+    )
+    cursor.execute(
+        'DELETE FROM pending_votes WHERE anon_id = ? AND kind = ? AND target_id = ? AND persona_id IS ?',
+        (anon_id, kind, target_id, persona_id),
+    )
+    cursor.execute(
+        'INSERT INTO pending_votes (anon_id, kind, target_id, persona_id, score, ip_address) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        (anon_id, kind, target_id, persona_id, score, ip_address),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_pending_votes(anon_id):
+    """All votes waiting for this visitor to sign up, oldest first."""
+    if not anon_id:
+        return []
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM pending_votes WHERE anon_id = ? AND datetime(created_at) >= datetime('now', ?) ORDER BY id",
+        (anon_id, f'-{PENDING_VOTE_TTL_DAYS} days'),
+    )
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def count_recent_pending_votes_by_ip(ip_address, hours=24):
+    """Anonymous votes from one IP in the last `hours` (abuse guard)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM pending_votes WHERE ip_address = ? AND datetime(created_at) >= datetime('now', ?)",
+        (ip_address, f'-{int(hours)} hours'),
+    )
+    n = cursor.fetchone()[0]
+    conn.close()
+    return n
+
+
+def delete_pending_votes(anon_id):
+    """Drop a visitor's pending votes (after they've been claimed)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM pending_votes WHERE anon_id = ?', (anon_id,))
+    conn.commit()
+    conn.close()
