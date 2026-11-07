@@ -1,5 +1,4 @@
 raw_material/
-website1/
 EVS/data/
 EVS/documentation/
 *.pyc
@@ -10,3 +9,11 @@ __pycache__/
 # Local user data: accounts (emails, password hashes) and uploaded avatars
 website2/backend/data/users.db
 website2/backend/data/avatars/
+
+# Generated renders and local settings
+EVS/README.html
+EVS/README_files/
+.claude/settings.local.json
+
+# Backups written by data migration scripts
+*.bak-*
