@@ -1136,43 +1136,8 @@ button.toast-action { border: 0; background: none; padding: 0; color: inherit; f
 .avatar-edit:hover .avatar-edit-badge { background: rgba(0, 0, 0, 0.75); }
 .avatar-edit-badge svg { width: 18px; height: 18px; display: block; }
 
-/* Profile: followed topics, same pills and card as the rest of the page. */
-.followed-tags-list {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 16px;
-}
-.followed-tags-toolbar { justify-content: flex-start; margin-bottom: 12px; }
-.followed-tags-content { gap: 6px; }
-.followed-tag {
-    gap: 2px;
-    padding: 4px 4px 4px 12px;
-    background: var(--tint);
-    border: 0;
-    border-radius: 999px;
-    transition: none;
-}
-.followed-tag:hover { border-color: transparent; transform: none; }
-.followed-tag-link { font-size: 14px; font-weight: 500; color: var(--text); text-decoration: none; }
-.followed-tag-link:hover { color: var(--brand); text-decoration: none; }
-.tag-remove {
-    width: 22px;
-    height: 22px;
-    border: 0;
-    background: none;
-    color: var(--muted);
-    font-size: 16px;
-}
-.tag-remove:hover { background: var(--line); color: var(--text); }
-#tagsFollowingSection .followed-tags-content .empty-message {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: var(--muted);
-    font-size: 14px;
-}
+/* Profile: followed topics are the homepage pills, flush under their heading. */
+.profile-rail-section .topic-row { margin: 0; }
 .profile-avatar .error-message { margin-top: 0.35rem; font-size: 0.85rem; }
 
 /* A neutral note in a form (e.g. « Il vous faut un compte »); styles.css only shows success/error ones. */

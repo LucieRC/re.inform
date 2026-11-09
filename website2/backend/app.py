@@ -841,8 +841,12 @@ def get_all_tags():
 # ========================================
 
 @app.route('/api/user/<int:user_id>/followed-tags', methods=['GET'])
+@login_required
 def get_user_followed_tags(user_id):
-    """Get tags a user is following."""
+    """Get the tags a user follows (private: owner only)."""
+    if current_user.id != user_id:
+        return api_error('not_your_account', 'Unauthorized', 403)
+
     tags = db.get_followed_tags(user_id)
     return jsonify({
         'user_id': user_id,
@@ -886,8 +890,12 @@ def unfollow_tag(user_id, tag):
 # ========================================
 
 @app.route('/api/user/<int:user_id>/following', methods=['GET'])
+@login_required
 def get_user_following(user_id):
-    """Get users that this user is following."""
+    """Get users that this user is following (private: owner only)."""
+    if current_user.id != user_id:
+        return api_error('not_your_account', 'Unauthorized', 403)
+
     following = db.get_following(user_id)
     return jsonify({
         'user_id': user_id,
@@ -896,8 +904,13 @@ def get_user_following(user_id):
     })
 
 @app.route('/api/user/<int:user_id>/followers', methods=['GET'])
+@login_required
 def get_user_followers(user_id):
-    """Get users following this user."""
+    """Get users following this user (owner only: read across every account,
+    public follower lists would rebuild anyone's private following list)."""
+    if current_user.id != user_id:
+        return api_error('not_your_account', 'Unauthorized', 403)
+
     followers = db.get_followers(user_id)
     return jsonify({
         'user_id': user_id,

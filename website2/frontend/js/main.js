@@ -700,25 +700,11 @@ async function initProfilePage() {
     }
 }
 
-// Wire up the profile page's buttons and modal (no inline handlers, so keyboard
-// and focus behave and the markup stays clean).
+// Wire up the profile page's buttons (no inline handlers, so keyboard and focus
+// behave and the markup stays clean).
 function setupProfileControls() {
     document.getElementById('followButton')?.addEventListener('click', toggleFollow);
-    document.getElementById('addTagsBtn')?.addEventListener('click', openTagSelector);
     setupAvatarControls();
-
-    const modal = document.getElementById('tagSelectorModal');
-    if (modal && !modal.dataset.bound) {
-        modal.dataset.bound = 'true';
-        modal.querySelectorAll('[data-close-tag-selector]').forEach((btn) => {
-            btn.addEventListener('click', closeTagSelector);
-        });
-        // Backdrop click and Escape close the dialog, like the argument composer.
-        modal.addEventListener('click', (e) => { if (e.target === modal) closeTagSelector(); });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.style.display !== 'none') closeTagSelector();
-        });
-    }
 }
 
 // ---- Level bar (reputation → progression, per the gamification design) ----
@@ -1066,21 +1052,29 @@ function renderContributionStatus(items, counts) {
         </div>`;
 }
 
+// The claims, once per page: they give the topic order and the recommendations.
+// Credentialed so the API can flag claims we authored or already answered.
+let profileClaims = null;
+function fetchProfileClaims() {
+    profileClaims ||= fetch(`${API_BASE_URL}/arguments`, { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => (Array.isArray(data) ? data : []));
+    return profileClaims;
+}
+
 // ---- Recommended for you (claims matched to followed tags) ----
 async function loadRecommendations() {
     const container = document.getElementById('recommendationsContent');
     if (!container) return;
 
     try {
-        const [tagsRes, argsRes] = await Promise.all([
+        const [tagsRes, args] = await Promise.all([
             fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, { credentials: 'include' }),
-            // Credentialed so the API can flag claims we authored or already answered.
-            fetch(`${API_BASE_URL}/arguments`, { credentials: 'include' }),
+            fetchProfileClaims(),
         ]);
         if (tagsRes.status === 401) return goToLogin();
         const followed = tagsRes.ok ? (await tagsRes.json()).followed_tags.map((t) => t.tag) : [];
-        const args = argsRes.ok ? await argsRes.json() : [];
-        renderRecommendations(Array.isArray(args) ? args : [], followed);
+        renderRecommendations(args, followed);
     } catch (error) {
         console.error('Recommendations error:', error);
         container.innerHTML = `<p class="empty-message">${escapeHtml(t('reco.loadError'))}</p>`;
@@ -1097,7 +1091,7 @@ function renderRecommendations(args, followedTags) {
         container.innerHTML = `
             <p class="empty-message">${escapeHtml(t('reco.pickTopics'))}
             <button type="button" class="btn btn-secondary btn-small" id="recAddTags">${escapeHtml(t('reco.pickTopicsBtn'))}</button></p>`;
-        document.getElementById('recAddTags')?.addEventListener('click', openTagSelector);
+        document.getElementById('recAddTags')?.addEventListener('click', goToTopicPills);
         return;
     }
 
@@ -1465,169 +1459,76 @@ function displayProfileContributions(contributions) {
 // Tag Following Functions
 // ========================================
 
+let followedTopics = new Set();
+const savingTopics = new Set();
+
 async function loadFollowedTags() {
     const container = document.getElementById('followedTagsContent');
-    
+
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, {
-            credentials: 'include'
-        });
-        
-        if (response.status === 401) return goToLogin();
+        const [response, claims] = await Promise.all([
+            fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, { credentials: 'include' }),
+            fetchProfileClaims(),
+        ]);
         if (!response.ok) throw new Error('Failed to load followed tags');
-        
+
         const data = await response.json();
-        
-        if (data.followed_tags.length === 0) {
-            container.innerHTML = `<p class="empty-message">${escapeHtml(t('profile.tagsEmptyLong'))}</p>`;
-            return;
-        }
-        
-        container.innerHTML = '';
-        data.followed_tags.forEach(({ tag }) => {
-            const wrapper = document.createElement('span');
-            wrapper.className = 'followed-tag';
+        followedTopics = new Set(data.followed_tags.map(({ tag }) => tag.toLowerCase()));
 
-            const link = document.createElement('a');
-            link.className = 'followed-tag-link';
-            link.href = `resources.html?tag=${encodeURIComponent(tag)}`;
-            link.textContent = topicLabel(tag);
+        // Homepage order; a followed theme no claim uses any more stays listed so it can be unfollowed.
+        const topics = [...new Set([...topicsByUse(claims).map((tag) => tag.toLowerCase()), ...followedTopics])];
 
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'tag-remove';
-            removeBtn.title = t('profile.unfollow');
-            removeBtn.textContent = '×';
-            removeBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                unfollowTag(tag);
-            });
-
-            wrapper.appendChild(link);
-            wrapper.appendChild(removeBtn);
-            container.appendChild(wrapper);
-        });
-        
+        container.innerHTML = topics.map((tag) =>
+            `<button type="button" class="topic" data-value="${escapeHtml(tag)}" aria-pressed="${followedTopics.has(tag)}">${escapeHtml(topicLabel(tag))}</button>`
+        ).join('');
+        container.onclick = (e) => {
+            const pill = e.target.closest('.topic');
+            if (pill) toggleFollowedTopic(pill);
+        };
     } catch (error) {
         console.error('Error loading followed tags:', error);
         container.innerHTML = `<p class="error-message">${escapeHtml(t('profile.tagsLoadError'))}</p>`;
     }
 }
 
-async function unfollowTag(tag) {
+// One click saves right away; the pill flips first and flips back if the save fails.
+async function toggleFollowedTopic(pill) {
+    const tag = pill.dataset.value;
+    if (savingTopics.has(tag)) return;
+    savingTopics.add(tag);
+
+    const wasFollowing = pill.getAttribute('aria-pressed') === 'true';
+    pill.setAttribute('aria-pressed', String(!wasFollowing));
+    const url = `${API_BASE_URL}/user/${currentUser.id}/followed-tags`;
+
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags/${tag}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-        
-        if (response.status === 401) return goToLogin();
-        
-        if (response.ok) {
-            await loadFollowedTags();
+        const response = await fetch(wasFollowing ? `${url}/${encodeURIComponent(tag)}` : url, wasFollowing
+            ? { method: 'DELETE', credentials: 'include' }
+            : { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ tag }) });
+
+        const data = response.ok ? {} : await response.json().catch(() => ({}));
+        // Already in the wanted state (changed in another tab) counts as saved.
+        if (!response.ok && !['already_following_tag', 'not_following_tag'].includes(data.code)) {
+            pill.setAttribute('aria-pressed', String(wasFollowing));
+            apiErrorToast(data, 'profile.tagSaveError', response);
+            return;
         }
+
+        if (wasFollowing) followedTopics.delete(tag); else followedTopics.add(tag);
+        renderRecommendations(await fetchProfileClaims(), [...followedTopics]);
     } catch (error) {
-        console.error('Error unfollowing tag:', error);
+        console.error('Error saving followed tag:', error);
+        pill.setAttribute('aria-pressed', String(wasFollowing));
+        showToast(t('common.serverUnreachable'));
+    } finally {
+        savingTopics.delete(tag);
     }
 }
 
-async function followTag(tag) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ tag: tag })
-        });
-        
-        if (response.status === 401) return goToLogin();
-        
-        if (response.ok) {
-            await loadFollowedTags();
-            // Update the tag selector UI
-            const tagEl = document.querySelector(`[data-tag="${tag}"]`);
-            if (tagEl) {
-                tagEl.classList.add('selected');
-            }
-        }
-    } catch (error) {
-        console.error('Error following tag:', error);
-    }
-}
-
-async function openTagSelector() {
-    const modal = document.getElementById('tagSelectorModal');
-    const grid = document.getElementById('tagSelectorGrid');
-
-    // Remember what opened the dialog so focus can return there on close.
-    tagSelectorReturnFocus = document.activeElement;
-
-    // Load all available tags
-    try {
-        const [tagsResponse, followedResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/tags`),
-            fetch(`${API_BASE_URL}/user/${currentUser.id}/followed-tags`, { credentials: 'include' })
-        ]);
-
-        if (followedResponse.status === 401) return goToLogin();
-        const tagsData = await tagsResponse.json();
-        const followedData = await followedResponse.json();
-        const followedSet = new Set(followedData.followed_tags.map(t => t.tag));
-
-        grid.innerHTML = tagsData.tags.map(tag => `
-            <button
-                type="button"
-                class="tag-selector-item ${followedSet.has(tag) ? 'selected' : ''}"
-                data-tag="${escapeHtml(tag)}"
-                aria-pressed="${followedSet.has(tag) ? 'true' : 'false'}"
-            >
-                ${escapeHtml(topicLabel(tag))}
-            </button>
-        `).join('');
-
-        // Delegated handler instead of inline onclick (keeps markup clean and
-        // works for keyboard activation).
-        if (!grid.dataset.bound) {
-            grid.dataset.bound = 'true';
-            grid.addEventListener('click', (e) => {
-                const btn = e.target.closest('.tag-selector-item');
-                if (btn) toggleTagFollow(btn.dataset.tag);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading tags:', error);
-        grid.innerHTML = `<p class="error-message">${escapeHtml(t('profile.tagsLoadError'))}</p>`;
-    }
-
-    modal.style.display = 'flex';
-    // Move focus into the dialog for keyboard/screen-reader users.
-    modal.querySelector('.modal-close')?.focus();
-}
-
-let tagSelectorReturnFocus = null;
-
-function closeTagSelector() {
-    document.getElementById('tagSelectorModal').style.display = 'none';
-    // Return focus to whatever opened the dialog.
-    if (tagSelectorReturnFocus && typeof tagSelectorReturnFocus.focus === 'function') {
-        tagSelectorReturnFocus.focus();
-    }
-    tagSelectorReturnFocus = null;
-}
-
-async function toggleTagFollow(tag) {
-    const tagEl = document.querySelector(`.tag-selector-item[data-tag="${tag}"]`);
-    const isSelected = tagEl.classList.contains('selected');
-
-    if (isSelected) {
-        await unfollowTag(tag);
-        tagEl.classList.remove('selected');
-    } else {
-        await followTag(tag);
-        tagEl.classList.add('selected');
-    }
-    tagEl.setAttribute('aria-pressed', String(!isSelected));
+// From the recommendations' empty state to the pills that fill it.
+function goToTopicPills() {
+    document.getElementById('tagsFollowingSection')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.querySelector('#followedTagsContent .topic')?.focus({ preventScroll: true });
 }
 
 // ========================================
@@ -3389,10 +3290,7 @@ async function initRespondPage() {
         renderPersonaChips(feedPersonaList.filter((p) => isNamedPersona(p)
             && (archetypeIds.has(p.id) || personasWithClaims.has(p.id))));
 
-        // Topics, most used first.
-        const topicCounts = new Map();
-        allArguments.forEach((a) => (a.tags || []).forEach((t) => t && topicCounts.set(t, (topicCounts.get(t) || 0) + 1)));
-        renderTopicChips([...topicCounts.entries()].sort((x, y) => y[1] - x[1]).map(([t]) => t));
+        renderTopicChips(topicsByUse(allArguments));
 
         renderArgumentsList();
     } catch (error) {
@@ -3432,6 +3330,13 @@ let feedTopicChoices = [];
 function renderPersonaChips(personas) {
     feedPersonaChoices = personas;
     renderFeedFilters();
+}
+
+// Every topic on these claims, most used first.
+function topicsByUse(claims) {
+    const counts = new Map();
+    claims.forEach((a) => (a.tags || []).forEach((tag) => tag && counts.set(tag, (counts.get(tag) || 0) + 1)));
+    return [...counts.entries()].sort((x, y) => y[1] - x[1]).map(([tag]) => tag);
 }
 
 function renderTopicChips(topics) {

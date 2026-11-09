@@ -116,16 +116,9 @@
                         <!-- Your choices live in the rail: topics and people you follow -->
                         <div id="tagsFollowingSection" class="profile-rail-section" style="display: none;">
                             <div class="section-header">
-                                <h3 data-i18n="profile.tagsTitle">Thèmes que vous suivez</h3>
+                                <h3 id="tagsTitle" data-i18n="profile.tagsTitle">Thèmes que vous suivez</h3>
                             </div>
-                            <div id="followedTagsList" class="followed-tags-list">
-                                <div class="followed-tags-toolbar">
-                                    <button id="addTagsBtn" type="button" class="btn btn-secondary btn-small" data-i18n="profile.addTags">+ Ajouter des thèmes</button>
-                                </div>
-                                <div id="followedTagsContent" class="followed-tags-content">
-                                    <p class="empty-message" data-i18n="profile.tagsEmpty">Vous ne suivez encore aucun thème.</p>
-                                </div>
-                            </div>
+                            <div id="followedTagsContent" class="topic-row" role="group" aria-labelledby="tagsTitle"></div>
                         </div>
 
                         <div id="followingSection" class="profile-rail-section" style="display: none;">
@@ -258,24 +251,6 @@
             </div>
         </section>
     </main>
-
-    <!-- Tag Selector Modal -->
-    <div id="tagSelectorModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="tagSelectorTitle">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="tagSelectorTitle" data-i18n="profile.tagModalTitle">Choisissez les thèmes à suivre</h3>
-                <button class="modal-close" type="button" data-close-tag-selector aria-label="Fermer" data-i18n-aria-label="common.close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="tagSelectorGrid" class="tag-selector-grid">
-                    <!-- Tags will be loaded here -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" type="button" data-close-tag-selector data-i18n="common.done">Terminé</button>
-            </div>
-        </div>
-    </div>
 
     <footer>
         <div class="container">

@@ -194,46 +194,7 @@ nav {
     color: var(--primary-color);
 }
 
-/* ========================================
-   Generic Modal (used by profile tag selector)
-   ======================================== */
-
-.modal {
-    position: fixed;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-md);
-    z-index: 1100;
-    background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(8px);
-}
-
-.modal-content {
-    width: 100%;
-    max-width: 760px;
-    max-height: 90vh;
-    overflow: auto;
-    background: var(--bg-white);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h3 {
-    margin: 0;
-}
-
+/* Close button of the argument composer */
 .modal-close {
     width: 36px;
     height: 36px;
@@ -250,47 +211,6 @@ nav {
     border-color: var(--primary-color);
 }
 
-.modal-body {
-    padding: var(--spacing-md);
-}
-
-.modal-footer {
-    padding: var(--spacing-md);
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: flex-end;
-}
-
-.tag-selector-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem;
-}
-
-.tag-selector-item {
-    border: 1px solid var(--border-color);
-    background: var(--bg-light);
-    color: var(--primary-color);
-    border-radius: 999px;
-    padding: 0.55rem 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.tag-selector-item:hover {
-    transform: translateY(-1px);
-    border-color: var(--primary-color);
-}
-
-.tag-selector-item.selected {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: var(--bg-white);
-}
-
-.tag-selector-item:focus-visible,
 .modal-close:focus-visible {
     outline: 2px solid var(--secondary-color);
     outline-offset: 2px;
@@ -1453,92 +1373,6 @@ section {
     padding: 0.5rem 0.95rem;
     font-size: 0.9rem;
     border-radius: 999px;
-}
-
-.followed-tags-list {
-    display: block;
-    background-color: var(--bg-white);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    padding: var(--spacing-md);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-
-.followed-tags-toolbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: var(--spacing-sm);
-}
-
-.followed-tags-content {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-#tagsFollowingSection .followed-tags-content .empty-message {
-    width: 100%;
-    text-align: left;
-    background-color: var(--bg-light);
-    border: 1px dashed var(--border-color);
-    border-radius: 10px;
-    padding: var(--spacing-md);
-    font-size: 1rem;
-}
-
-.followed-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.6rem 0.45rem 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    background-color: var(--bg-light);
-    transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.followed-tag:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-1px);
-}
-
-.followed-tag-link {
-    font-weight: 600;
-    color: var(--primary-color);
-}
-
-.followed-tag-link:hover {
-    color: var(--primary-color);
-    text-decoration: underline;
-}
-
-.tag-remove {
-    width: 24px;
-    height: 24px;
-    border: 1px solid var(--border-color);
-    background-color: var(--bg-white);
-    color: var(--text-light);
-    border-radius: 999px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    font-size: 1.1rem;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.tag-remove:hover {
-    background-color: var(--border-color);
-    color: var(--text-color);
-    border-color: var(--border-color);
-}
-
-.tag-remove:focus-visible,
-.followed-tag-link:focus-visible {
-    outline: 2px solid var(--secondary-color);
-    outline-offset: 2px;
 }
 
 .profile-layout {
