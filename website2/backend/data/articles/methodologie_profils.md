@@ -97,4 +97,4 @@ Ces fourchettes sont larges et ne sont pas centrées sur le pourcentage affiché
 - [Documentation sur les poids de l'enquête EVS 2017](https://doi.org/10.21241/ssoar.70113).
 - [Bon Pote](https://bonpote.com), média dont l'esprit a inspiré les personnages.
 
-**Le code n'est pas encore publié.** Trois scripts produisent tous les résultats chiffrés : `stance_personas.py` construit les groupes, `stance_margins.py` calcule les marges d'erreur et `export_personas.py` associe les groupes aux personnages. Les données brutes se téléchargent auprès de GESIS, après inscription.
+**Le code est public**, dans [`EVS/bin`](https://github.com/LucieRC/re.inform/tree/main/EVS/bin). Trois scripts produisent tous les résultats chiffrés : `stance_personas.py` construit les groupes, `stance_margins.py` calcule les marges d'erreur et `export_personas.py` associe les groupes aux personnages. Les données brutes se téléchargent auprès de GESIS, après inscription.
