@@ -13,7 +13,6 @@ website2/backend/data/avatars/
 # Generated renders and local settings
 EVS/README.html
 EVS/README_files/
-.claude/settings.local.json
 
 # Backups written by data migration scripts
 *.bak-*
@@ -29,3 +28,7 @@ EVS/output/
 EVS/documentation_scrapping/*.csv
 EVS/documentation_scrapping/*.html
 archive/website2-legacy-data/*.json
+
+# Internal notes and working material stay out of the public repository
+docs/
+archive/website2-initial-plan.prompt.md
