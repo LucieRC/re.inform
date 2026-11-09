@@ -51,6 +51,7 @@ const ICON_PATHS = {
     video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/>',
     headphones: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>',
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    quote: '<path d="M10 7H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M20 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M10 7v8M20 7v8"/>',
     building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
 };
 
@@ -310,6 +311,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check authentication state first
     await checkAuthState();
     
+    // The « page introuvable » page has nothing to load (and its address can be anything).
+    if (document.body.dataset.page === '404') return;
+
     // Initialize page-specific functionality
     const currentPage = window.location.pathname.split('/').pop() || 'index.html';
     
@@ -435,6 +439,25 @@ function authHref(page = 'login.html') {
     return `${page}?next=${encodeURIComponent(here + window.location.search + window.location.hash)}`;
 }
 
+// Same, but the return address gets some query params changed, e.g. { write: 3 }
+// so the answer form opens again after logging in.
+function authHrefWith(page, params = {}) {
+    const url = new URL(window.location.href);
+    Object.entries(params).forEach(([k, v]) => {
+        if (v == null || v === '') url.searchParams.delete(k); else url.searchParams.set(k, String(v));
+    });
+    const here = url.pathname.split('/').pop() || 'index.html';
+    return `${page}?next=${encodeURIComponent(here + url.search + url.hash)}`;
+}
+
+// « Se connecter » and « Créer un compte » toast links, both returning here.
+function authToastActions(params = {}) {
+    return [
+        { label: t('common.login'), href: authHrefWith('login.html', params) },
+        { label: t('common.createAccount'), href: authHrefWith('register.html', params) },
+    ];
+}
+
 // The session ended (API 401 auth_required): go to login, then come back here.
 function goToLogin() {
     window.location.href = authHref('login.html');
@@ -481,7 +504,16 @@ function initLoginPage() {
         const remember = document.getElementById('remember').checked;
         const formMessage = document.getElementById('formMessage');
         const loginBtn = document.getElementById('loginBtn');
-        
+
+        // Each attempt starts clean (no message left over from the last one).
+        formMessage.textContent = '';
+        formMessage.className = 'form-message';
+        if (!username || !password) {
+            formMessage.textContent = t('error.credentials_required');
+            formMessage.className = 'form-message error';
+            return;
+        }
+
         loginBtn.disabled = true;
         loginBtn.textContent = t('common.loggingIn');
         
@@ -551,10 +583,19 @@ function initRegisterPage() {
         const confirmPassword = document.getElementById('confirmPassword').value;
         const formMessage = document.getElementById('formMessage');
         const registerBtn = document.getElementById('registerBtn');
-        
-        // Validate passwords match
-        if (password !== confirmPassword) {
-            formMessage.textContent = t('register.mismatch');
+
+        // Each attempt starts clean; then the same checks as the server, in French.
+        formMessage.textContent = '';
+        formMessage.className = 'form-message';
+        const problem = !username || !email || !password ? 'error.fields_required'
+            : username.length < 3 ? 'error.username_too_short'
+            : username.length > 30 ? 'error.username_too_long'
+            : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'register.invalidEmail'
+            : password.length < 6 ? 'error.password_too_short'
+            : password !== confirmPassword ? 'register.mismatch'
+            : null;
+        if (problem) {
+            formMessage.textContent = t(problem);
             formMessage.className = 'form-message error';
             return;
         }
@@ -623,8 +664,8 @@ async function initProfilePage() {
     
     setupProfileControls();
 
-    // Load profile data
-    await loadProfileData();
+    // Load profile data (an unknown member stops here: only a "not found" message).
+    if (!(await loadProfileData())) return;
 
     // If own profile, load following sections
     if (isOwnProfile) {
@@ -648,6 +689,7 @@ async function initProfilePage() {
             loadFollowedTags(),
             loadFollowingProfiles(),
             loadContributionStatus(),
+            loadDrafts(),
         ]);
     } else {
         document.getElementById('contributionsTitle').textContent = t('profile.contributionsTitle');
@@ -879,6 +921,77 @@ const STATUS_META = {
     rejected: { icon: icon('x'),         label: t('status.rejected'), cls: 'status-rejected' },
 };
 
+// « Brouillons »: answers started but not published. Hidden when there are none.
+async function loadDrafts() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/me/drafts`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderDrafts(Array.isArray(data.drafts) ? data.drafts : []);
+    } catch (error) {
+        console.error('Error loading drafts:', error);
+    }
+}
+
+function renderDrafts(drafts) {
+    const section = document.getElementById('draftsSection');
+    const list = document.getElementById('draftsList');
+    if (!section || !list) return;
+    section.style.display = drafts.length ? 'block' : 'none';
+    list.innerHTML = '';
+    drafts.forEach((d) => {
+        const personaId = d.persona_archetype_id ?? null;
+        const who = personaId == null ? d.persona_name : t('profile.draftFor', { name: d.persona_name });
+        const row = document.createElement('div');
+        row.className = 'draft-row';
+        row.innerHTML = `
+            <div class="draft-main">
+                <p class="draft-claim">${d.claim_text ? quotedClaimHtml(d.claim_text) : escapeHtml(t('common.untitled'))}</p>
+                <p class="draft-meta">${escapeHtml(who || '')} · ${escapeHtml(formatTimeAgo(d.updated_at))}</p>
+            </div>
+            <a class="btn btn-secondary btn-small" href="argument.html?id=${encodeURIComponent(d.argument_id)}&amp;write=${encodeURIComponent(personaId ?? 'any')}">${escapeHtml(t('profile.draftResume'))}</a>
+            <button type="button" class="draft-delete" aria-label="${escapeHtml(t('profile.draftDelete'))}" title="${escapeHtml(t('profile.draftDelete'))}">${icon('x')}</button>`;
+        row.querySelector('.draft-delete').addEventListener('click', () => removeDraft(d, drafts));
+        list.appendChild(row);
+    });
+}
+
+async function removeDraft(draft, drafts) {
+    renderDrafts(drafts.filter((d) => d !== draft));
+    try {
+        const res = await deleteDraft(draft.id);
+        if (!res.ok && res.status !== 404) throw new Error(`Delete failed: ${res.status}`);
+    } catch (error) {
+        console.error('Error deleting draft:', error);
+        showToast(t('profile.draftDeleteError'));
+        return loadDrafts();
+    }
+    showToast(t('profile.draftDeleted'), {
+        duration: 6000,
+        actions: [{ label: t('common.cancel'), onClick: () => undoDraftDelete(draft) }],
+    });
+}
+
+async function undoDraftDelete(draft) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/me/drafts`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                argument_id: draft.argument_id,
+                persona_archetype_id: draft.persona_archetype_id ?? null,
+                text: draft.text || '',
+                sources: draftSourceUrls(draft),
+            }),
+        });
+        if (!res.ok) showToast(apiError(await res.json().catch(() => ({})), 'composer.draftError'));
+    } catch (_) {
+        showToast(t('composer.draftError'));
+    }
+    loadDrafts();
+}
+
 async function loadContributionStatus() {
     const container = document.getElementById('statusTrackerContent');
     if (!container) return;
@@ -894,6 +1007,13 @@ async function loadContributionStatus() {
         container.innerHTML = `<p class="empty-message">${escapeHtml(t('tracker.loadError'))}</p>`;
     }
 }
+
+// Tracker "Type" column: icon + label per kind of thing sent.
+const TRACKER_KIND = {
+    source: ['book', 'tracker.source'],
+    claim: ['quote', 'tracker.claim'],
+    response: ['message', 'tracker.response'],
+};
 
 function renderContributionStatus(items, counts) {
     const container = document.getElementById('statusTrackerContent');
@@ -911,9 +1031,9 @@ function renderContributionStatus(items, counts) {
 
     const rows = items.map((it) => {
         const meta = STATUS_META[it.status] || STATUS_META.pending;
-        const kind = it.kind === 'source'
-            ? `<span class="tracker-kind">${icon('book')} ${escapeHtml(t('tracker.source'))}</span>`
-            : `<span class="tracker-kind">${icon('message')} ${escapeHtml(t('tracker.response'))}</span>`;
+        const [kindIcon, kindKey] = TRACKER_KIND[it.kind] || TRACKER_KIND.response;
+        const kind = `<span class="tracker-kind">${icon(kindIcon)} ${escapeHtml(t(kindKey))}</span>`;
+        const title = it.title || it.text || t('common.untitled');
         const when = it.submitted_at
             ? `<time datetime="${escapeHtml(it.submitted_at)}">${escapeHtml(formatDate(it.submitted_at))}</time>`
             : '—';
@@ -921,10 +1041,10 @@ function renderContributionStatus(items, counts) {
         const inner = safeHref(it.href)
             || (it.kind !== 'source' && it.argument_id != null && it.status === 'approved' ? `argument.html?id=${encodeURIComponent(it.argument_id)}` : null);
         const link = inner
-            ? `<a href="${escapeHtml(inner)}">${escapeHtml(it.title)}</a>`
+            ? `<a href="${escapeHtml(inner)}">${escapeHtml(title)}</a>`
             : safeHref(it.url)
-                ? `<a href="${escapeHtml(safeHref(it.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(it.title)}</a>`
-                : escapeHtml(it.title);
+                ? `<a href="${escapeHtml(safeHref(it.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+                : escapeHtml(title);
         return `
             <tr>
                 <td data-label="${escapeHtml(t('tracker.colType'))}">${kind}</td>
@@ -1046,7 +1166,7 @@ async function loadFollowingActivity() {
     }
 }
 
-const ACTIVITY_ICON = { response: icon('message'), source: icon('book') };
+const ACTIVITY_ICON = { response: icon('message'), source: icon('book'), claim: icon('quote') };
 // The API sends an English verb; show ours, keyed by that verb (or the kind).
 const ACTIVITY_VERB_KEYS = {
     'answered a claim': 'activity.answeredClaim',
@@ -1094,6 +1214,10 @@ async function loadProfileData() {
             credentials: 'include'
         });
         
+        if (response.status === 404) {
+            showProfileNotFound();
+            return false;
+        }
         if (!response.ok) {
             throw new Error('Failed to load profile');
         }
@@ -1112,10 +1236,17 @@ async function loadProfileData() {
         renderProfileAvatar(data.user);
         
         // Update stats
-        document.getElementById('reputationScore').textContent = data.user.reputation_score;
-        document.getElementById('contributionCount').textContent = data.contribution_count;
-        document.getElementById('followingCount').textContent = data.following_count;
-        document.getElementById('followersCount').textContent = data.followers_count;
+        // Stats, with singular/plural labels (« 1 contribution », « 2 abonnés »).
+        document.getElementById('reputationScore').textContent = formatNumber(data.user.reputation_score);
+        [['contributionCount', data.contribution_count, 'profile.statContributions'],
+         ['followingCount', data.following_count, 'profile.statFollowing'],
+         ['followersCount', data.followers_count, 'profile.statFollowers']].forEach(([id, n, key]) => {
+            const dd = document.getElementById(id);
+            if (!dd) return;
+            dd.textContent = formatNumber(n);
+            const dt = dd.parentElement?.querySelector('dt');
+            if (dt) dt.textContent = t(key, { n: Number(n) || 0 });
+        });
 
         // Level bar (own profile only — the container is hidden otherwise).
         if (isOwnProfile) renderLevelBar(data.user.reputation_score);
@@ -1133,11 +1264,24 @@ async function loadProfileData() {
         
         // Update page title
         document.title = t('site.pageTitle', { page: data.user.username });
-        
+        return true;
     } catch (error) {
         console.error('Error loading profile:', error);
-        document.getElementById('profileUsername').textContent = t('profile.notFound');
+        showProfileNotFound();
+        return false;
     }
+}
+
+// No such member: replace the whole profile layout with one short message.
+function showProfileNotFound() {
+    const layout = document.querySelector('.profile-layout');
+    if (!layout) return;
+    document.title = t('site.pageTitle', { page: t('profile.notFound') });
+    layout.outerHTML = `
+        <div class="not-found">
+            <h2>${escapeHtml(t('profile.notFound'))}</h2>
+            <p>${t('profile.notFoundHtml')}</p>
+        </div>`;
 }
 
 function updateFollowButton() {
@@ -1181,11 +1325,9 @@ function renderProfileAvatar(user) {
         img.remove();
     }
 
-    // Upload controls only make sense on your own profile (needs login anyway).
-    const actions = document.getElementById('avatarActions');
-    if (actions) {
-        actions.style.display = (isOwnProfile && currentUser) ? 'block' : 'none';
-    }
+    // Changing the picture only makes sense on your own profile (needs login anyway).
+    const changeBtn = document.getElementById('changeAvatarBtn');
+    if (changeBtn) changeBtn.hidden = !(isOwnProfile && currentUser);
 }
 
 function setupAvatarControls() {
@@ -1213,9 +1355,8 @@ function setupAvatarControls() {
         const form = new FormData();
         form.append('avatar', file);
 
-        const originalText = changeBtn.textContent;
         changeBtn.disabled = true;
-        changeBtn.textContent = t('profile.uploading');
+        changeBtn.setAttribute('aria-label', t('profile.uploading'));
 
         try {
             const res = await fetch(`${API_BASE_URL}/me/avatar`, {
@@ -1230,7 +1371,10 @@ function setupAvatarControls() {
                 return;
             }
 
-            if (currentUser) currentUser.avatar_url = data.avatar_url;
+            if (currentUser) {
+                currentUser.avatar_url = data.avatar_url;
+                updateNavForLoggedInUser();
+            }
             renderProfileAvatar({
                 username: currentUser?.username || '',
                 avatar_url: data.avatar_url
@@ -1241,7 +1385,7 @@ function setupAvatarControls() {
             errorEl.style.display = 'block';
         } finally {
             changeBtn.disabled = false;
-            changeBtn.textContent = originalText;
+            changeBtn.setAttribute('aria-label', t('profile.changePhoto'));
         }
     });
 }
@@ -1573,7 +1717,7 @@ const CONTRIBUTOR_PROFILES = [
 // `open` reveals a workspace on this page; `href` (or `hrefFrom`, computed once
 // claims are loaded) leads to where the work happens.
 const CONTRIBUTOR_TASKS = Object.fromEntries(Object.entries({
-    // Voting, rating and answering happen in the home page's « Aider » mode.
+    // Voting, rating and answering happen in the home page's « Contribuer » mode.
     prioritize: { icon: 'target', account: false, href: 'index.html?mode=help&task=vote' },
     rate: { icon: 'star', account: false, href: 'index.html?mode=help&task=rate' },
     claim: { icon: 'plus', account: true, href: 'index.html?add=1' },
@@ -1787,11 +1931,13 @@ function renderAnswerGaps() {
 }
 
 // Home feed: the "Heard a claim…" prompt opens the claim form in place.
-function setupFeedComposer() {
-    const toggle = document.getElementById('feedComposerToggle');
-    const form = document.getElementById('feedComposer');
-    if (!toggle || !form) return;
-    const messageEl = document.getElementById('claimFormMessage');
+// A « + Ajouter… » button that unfolds its form in place.
+function setupFoldingForm({ toggleId, formId, cancelId, messageId, focusId, authHrefFor }) {
+    const toggle = document.getElementById(toggleId);
+    const form = document.getElementById(formId);
+    if (!toggle || !form) return null;
+    const messageEl = document.getElementById(messageId);
+    const isBlank = () => [...form.querySelectorAll('input, textarea')].every((f) => !f.value.trim());
 
     const open = () => {
         toggle.hidden = true;
@@ -1799,11 +1945,11 @@ function setupFeedComposer() {
         form.hidden = false;
         // Logged out: say so up front rather than after they've typed.
         if (!currentUser && !messageEl.textContent) {
-            messageEl.innerHTML = t('claimForm.needAccountHtml', { registerHref: authHref('register.html'), loginHref: authHref('login.html') });
+            messageEl.innerHTML = t('claimForm.needAccountHtml', { registerHref: authHrefFor('register.html'), loginHref: authHrefFor('login.html') });
             messageEl.className = 'form-message';
         }
         form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        document.getElementById('claimText').focus({ preventScroll: true });
+        document.getElementById(focusId).focus({ preventScroll: true });
     };
     const close = ({ refocus = true } = {}) => {
         form.hidden = true;
@@ -1818,11 +1964,10 @@ function setupFeedComposer() {
     };
 
     // Leaving the form (click or Tab elsewhere): keep it open if they've started
-    // writing so the draft stays visible; otherwise fold back to the prompt.
-    const textArea = document.getElementById('claimText');
+    // writing so the draft stays visible; otherwise fold back to the button.
     const collapseIfEmpty = (target) => {
         if (form.hidden || form.contains(target) || toggle.contains(target)) return;
-        if (textArea.value.trim()) return;
+        if (!isBlank()) return;
         close({ refocus: false });
     };
     document.addEventListener('pointerdown', (e) => collapseIfEmpty(e.target));
@@ -1831,11 +1976,111 @@ function setupFeedComposer() {
     });
 
     toggle.addEventListener('click', open);
-    document.getElementById('feedComposerCancel').addEventListener('click', () => close());
-    document.querySelectorAll('[data-open-composer]').forEach((b) => b.addEventListener('click', open));
-    setupClaimForm('feedComposer');
-    // ?add=1 (e.g. from the profile's "Add a claim" task) opens it straight away.
-    if (new URLSearchParams(window.location.search).get('add')) open();
+    document.getElementById(cancelId).addEventListener('click', () => close());
+    return { open };
+}
+
+function setupFeedComposer() {
+    const params = new URLSearchParams(window.location.search);
+    const claim = setupFoldingForm({
+        toggleId: 'feedComposerToggle', formId: 'feedComposer', cancelId: 'feedComposerCancel',
+        messageId: 'claimFormMessage', focusId: 'claimText', authHrefFor: authHref,
+    });
+    if (claim) {
+        document.querySelectorAll('[data-open-composer]').forEach((b) => b.addEventListener('click', claim.open));
+        setupClaimForm('feedComposer');
+        // ?add=1 (e.g. from the profile's "Add a claim" task) opens it straight away.
+        if (params.get('add')) claim.open();
+    }
+
+    const resource = setupFoldingForm({
+        toggleId: 'feedResourceToggle', formId: 'feedResourceForm', cancelId: 'feedResourceCancel',
+        messageId: 'quickResourceMessage', focusId: 'quickResourceUrl',
+        authHrefFor: (page) => authHrefWith(page, { addResource: 1 }),
+    });
+    if (resource) {
+        setupQuickResourceForm();
+        if (params.get('addResource')) {
+            resource.open();
+            restoreQuickResourceDraft();
+        }
+    }
+}
+
+// What was typed in « Ajouter une ressource » survives the detour through login, for this tab.
+const RESOURCE_DRAFT_KEY = 'reinform.resourceDraft';
+
+function keepQuickResourceDraft() {
+    const url = document.getElementById('quickResourceUrl').value;
+    const note = document.getElementById('quickResourceNote').value;
+    try {
+        if (url.trim() || note.trim()) sessionStorage.setItem(RESOURCE_DRAFT_KEY, JSON.stringify({ url, note }));
+        else sessionStorage.removeItem(RESOURCE_DRAFT_KEY);
+    } catch (_) { /* private mode */ }
+}
+
+function clearQuickResourceDraft() {
+    try { sessionStorage.removeItem(RESOURCE_DRAFT_KEY); } catch (_) { /* private mode */ }
+}
+
+function restoreQuickResourceDraft() {
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem(RESOURCE_DRAFT_KEY) || 'null'); } catch (_) { return; }
+    if (!draft) return;
+    const urlEl = document.getElementById('quickResourceUrl');
+    const noteEl = document.getElementById('quickResourceNote');
+    if (!urlEl.value) urlEl.value = draft.url || '';
+    if (!noteEl.value) noteEl.value = draft.note || '';
+}
+
+// « Ajouter une ressource »: a link and an optional title or note. Goes to moderator review.
+function setupQuickResourceForm() {
+    const form = document.getElementById('feedResourceForm');
+    const messageEl = document.getElementById('quickResourceMessage');
+    const submitBtn = document.getElementById('quickResourceSubmit');
+    const showMessage = (html, type) => {
+        messageEl.innerHTML = html;
+        messageEl.className = `form-message ${type}`;
+    };
+    const loginFirst = () => showMessage(t('claimForm.loginFirstHtml', {
+        registerHref: authHrefWith('register.html', { addResource: 1 }),
+        loginHref: authHrefWith('login.html', { addResource: 1 }),
+    }), 'error');
+
+    form.addEventListener('input', keepQuickResourceDraft);
+    document.getElementById('feedResourceCancel')?.addEventListener('click', clearQuickResourceDraft);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return loginFirst();
+        const url = document.getElementById('quickResourceUrl').value.trim();
+        const title = document.getElementById('quickResourceNote').value.trim();
+        if (!url) return showMessage(escapeHtml(t('resourceForm.needLink')), 'error');
+        if (!isWebLink(url)) return showMessage(escapeHtml(t('composer.sourceInvalid')), 'error');
+
+        submitBtn.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE_URL}/resources`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ url, title }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                if (data?.code === 'auth_required') return loginFirst();
+                return showMessage(escapeHtml(apiError(data, 'resourceForm.error')), 'error');
+            }
+            form.reset();
+            clearQuickResourceDraft();
+            showMessage(escapeHtml(t('resourceForm.success')), 'success');
+        } catch (error) {
+            console.error('Resource submission error:', error);
+            showMessage(escapeHtml(t('common.serverUnreachable')), 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
 }
 
 function setupClaimForm(formId = 'claimForm') {
@@ -1855,7 +2100,10 @@ function setupClaimForm(formId = 'claimForm') {
             return;
         }
         const text = document.getElementById('claimText').value.trim();
-        if (!text) return;
+        if (!text) {
+            showMessage(escapeHtml(t('error.claim_text_required')), 'error');
+            return;
+        }
 
         submitBtn.disabled = true;
         try {
@@ -2143,11 +2391,19 @@ function createContributionCard(contribution) {
     if (counterArgumentText && quoteText !== counterArgumentText) {
         detailsParts.push(`<div class="contribution-detail"><strong>${escapeHtml(t('contrib.response'))}</strong> ${escapeHtml(counterArgumentText)}</div>`);
     }
-    if (contribution.title) {
+    // A claim's title is just its text cut short: don't repeat it.
+    if (contribution.title && contribution.kind !== 'claim') {
         detailsParts.push(`<div class="contribution-detail"><strong>${escapeHtml(t('contrib.title'))}</strong> ${escapeHtml(contribution.title)}</div>`);
     }
     
+    // Kind chip so a claim the person added and an answer they wrote don't look alike.
+    const kindMeta = { claim: TRACKER_KIND.claim, response: TRACKER_KIND.response }[contribution.kind];
+    const kindHTML = kindMeta
+        ? `<span class="needs-badge contribution-kind">${icon(kindMeta[0])} ${escapeHtml(t(kindMeta[1]))}</span>`
+        : '';
+
     card.innerHTML = `
+        ${kindHTML}
         <button type="button" class="contribution-quote" aria-expanded="false">
             <span class="contribution-quote-mark" aria-hidden="true">“</span>
             <span class="contribution-quote-text">${escapeHtml(quoteText)}</span>
@@ -2196,7 +2452,63 @@ let allBlogResources = [];
 // Personalities Page (EVS personas)
 // ========================================
 
+// « Comment ces profils ont été construits »: opens inline at the end of the
+// page. The text is fetched on first open; a failed fetch is retried on the next.
+const METHODOLOGY_SRC = '/api/articles/methodologie_profils.md';
+const METHODOLOGY_HASH = '#methodologie';
+
+function setupMethodologySection() {
+    const section = document.getElementById('methodologie');
+    const toggle = document.getElementById('methodToggle');
+    const panel = document.getElementById('methodPanel');
+    const loadingEl = document.getElementById('methodLoading');
+    const errorEl = document.getElementById('methodError');
+    const bodyEl = document.getElementById('methodBody');
+    if (!section || !toggle || !panel || !loadingEl || !errorEl || !bodyEl) return () => {};
+
+    let loaded = false;
+    let loading = false;
+
+    async function load() {
+        if (loaded || loading) return;
+        loading = true;
+        errorEl.hidden = true;
+        loadingEl.hidden = false;
+        try {
+            const res = await fetch(METHODOLOGY_SRC, { headers: { 'Accept': 'text/markdown' } });
+            if (!res.ok) throw new Error(`Failed to load methodology (${res.status})`);
+            bodyEl.innerHTML = markdownToHtml(await res.text());
+            loaded = true;
+        } catch (error) {
+            console.error(error);
+            errorEl.textContent = t('personas.methodError');
+            errorEl.hidden = false;
+        } finally {
+            loading = false;
+            loadingEl.hidden = true;
+        }
+    }
+
+    function setOpen(open) {
+        toggle.setAttribute('aria-expanded', String(open));
+        panel.hidden = !open;
+        return open ? load() : Promise.resolve();
+    }
+
+    // Scrolls once the text is in: before that the page is too short to reach it.
+    async function openFromHash() {
+        if (window.location.hash !== METHODOLOGY_HASH) return;
+        await setOpen(true);
+        section.scrollIntoView();
+    }
+
+    toggle.addEventListener('click', () => setOpen(panel.hidden));
+    window.addEventListener('hashchange', openFromHash);
+    return openFromHash;
+}
+
 async function initPersonalitiesPage() {
+    const openMethodologyFromHash = setupMethodologySection();
     const loadingMessage = document.getElementById('loadingMessage');
     const errorMessage = document.getElementById('errorMessage');
     const grid = document.getElementById('personalitiesGrid');
@@ -2238,6 +2550,9 @@ async function initPersonalitiesPage() {
             errorMessage.textContent = t('personas.loadError');
             errorMessage.style.display = 'block';
         }
+    } finally {
+        // After the cards are in, so the page no longer moves under the scroll.
+        openMethodologyFromHash();
     }
 }
 
@@ -2370,6 +2685,13 @@ async function initPersonalityDetailPage() {
         if (!res.ok) throw new Error('Failed to load personalities');
         const all = await res.json();
         const list = Array.isArray(all) ? all : [];
+        // Old profile links (retired groups) open the profile that replaced them.
+        const newId = replacementPersonaId(list, id);
+        if (newId != null) {
+            params.set('id', newId);
+            window.location.replace(`personality.html?${params}${window.location.hash}`);
+            return;
+        }
         const p = list.find((x) => isActivePersona(x) && x.id === id);
 
         const allArgs = argsRes.ok ? await argsRes.json() : [];
@@ -2386,6 +2708,8 @@ async function initPersonalityDetailPage() {
         if (container) {
             container.style.display = 'block';
             renderPersonaProfile(p, container, personaArgs);
+            const methodLink = document.getElementById('personaMethodLink');
+            if (methodLink) methodLink.hidden = false;
         }
 
         // Prev/next among the named archetypes only.
@@ -2567,7 +2891,8 @@ function renderPersonaNav(archetypes, currentId) {
 
 let toastTimer = null;
 
-function showToast(message, { actionLabel = null, actionHref = null, duration = 4000 } = {}) {
+// `actions`: several links ([{ label, href }]), e.g. « Se connecter » and « Créer un compte ».
+function showToast(message, { actionLabel = null, actionHref = null, actions = null, duration = 4000 } = {}) {
     let toast = document.getElementById('toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -2578,10 +2903,20 @@ function showToast(message, { actionLabel = null, actionHref = null, duration = 
         document.body.appendChild(toast);
     }
 
-    const actionHtml = actionLabel && actionHref
-        ? ` <a class="toast-action" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a>`
+    const links = (actions || (actionLabel && actionHref ? [{ label: actionLabel, href: actionHref }] : []))
+        .filter((a) => a && a.label && (a.href || a.onClick));
+    const actionHtml = links.length
+        ? ` <span class="toast-actions">${links.map((a, i) => (a.onClick
+            ? `<button type="button" class="toast-action" data-action="${i}">${escapeHtml(a.label)}</button>`
+            : `<a class="toast-action" href="${escapeHtml(a.href)}">${escapeHtml(a.label)}</a>`)).join('')}</span>`
         : '';
     toast.innerHTML = `<span>${escapeHtml(message)}</span>${actionHtml}`;
+    toast.querySelectorAll('button[data-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            toast.classList.remove('is-visible');
+            links[Number(btn.dataset.action)].onClick();
+        });
+    });
     toast.classList.add('is-visible');
 
     if (toastTimer) clearTimeout(toastTimer);
@@ -2602,6 +2937,8 @@ function showToast(message, { actionLabel = null, actionHref = null, duration = 
 //   }) -> { getState, setFacetOptions(id, options), clearAll }
 // ========================================
 
+const CHIPS_PER_FACET = 5;
+
 const SEARCH_ICON_SVG = `
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -2617,6 +2954,9 @@ function createFilterBar(mount, spec) {
         icon: f.icon || '',
         options: f.options || [],
         selected: new Set((f.selected || []).map(String)),
+        searchable: Boolean(f.searchable),
+        searchPlaceholder: f.searchPlaceholder || t('filter.search'),
+        query: '',
     }));
     const facetById = new Map(facets.map((f) => [f.id, f]));
 
@@ -2697,6 +3037,10 @@ function createFilterBar(mount, spec) {
         facet._btn.setAttribute('aria-expanded', 'true');
         facet._group.classList.add('is-open');
         openId = facet.id;
+        // No autofocus on touch screens: it would pop the keyboard over the list.
+        if (facet.searchable && window.matchMedia('(hover: hover)').matches) {
+            facet._menu.querySelector('.filterbar-menu-search')?.focus();
+        }
     }
 
     function closeMenus() {
@@ -2704,22 +3048,51 @@ function createFilterBar(mount, spec) {
             f._menu.hidden = true;
             f._btn.setAttribute('aria-expanded', 'false');
             f._group.classList.remove('is-open');
+            f.query = '';
+            f._menu.innerHTML = '';
         });
         openId = null;
     }
 
     function renderMenu(facet) {
+        const menu = facet._menu;
         if (!facet.options.length) {
-            facet._menu.innerHTML = `<p class="filterbar-menu-empty">${escapeHtml(t('filter.nothing'))}</p>`;
+            menu.innerHTML = `<p class="filterbar-menu-empty">${escapeHtml(t('filter.nothing'))}</p>`;
             return;
         }
-        facet._menu.innerHTML = '<div class="filterbar-options">' + facet.options.map((o) => {
+        // The search box and buttons stay in place while the list below is redrawn.
+        if (!menu.querySelector('.filterbar-options')) {
+            menu.classList.toggle('has-search', facet.searchable);
+            menu.innerHTML = (facet.searchable ? `
+                <div class="filterbar-menu-head">
+                    <input type="search" class="filterbar-menu-search" placeholder="${escapeHtml(facet.searchPlaceholder)}" aria-label="${escapeHtml(facet.searchPlaceholder)}" autocomplete="off">
+                    <div class="filterbar-menu-actions">
+                        <button type="button" data-select-all>${escapeHtml(t('filter.selectAll'))}</button>
+                        <button type="button" data-clear-selection>${escapeHtml(t('filter.clearAll'))}</button>
+                    </div>
+                </div>` : '') + '<div class="filterbar-options"></div>';
+            if (facet.searchable) wireMenuHead(facet);
+        }
+        renderOptions(facet);
+    }
+
+    function visibleOptions(facet) {
+        const q = normalizeSearch(facet.query);
+        return q ? facet.options.filter((o) => normalizeSearch(o.label).includes(q)) : facet.options;
+    }
+
+    function renderOptions(facet) {
+        const list = facet._menu.querySelector('.filterbar-options');
+        const scrollTop = list.scrollTop;
+        const shown = visibleOptions(facet);
+        list.innerHTML = shown.length ? shown.map((o) => {
             const checked = facet.selected.has(String(o.value)) ? 'checked' : '';
             const c = (typeof o.count === 'number') ? `<span class="filterbar-opt-count">${o.count}</span>` : '';
             return `<label class="filterbar-option"><input type="checkbox" value="${escapeHtml(String(o.value))}" ${checked}><span>${personaEmojiHtml(o.emoji)}${escapeHtml(o.label)}</span>${c}</label>`;
-        }).join('') + '</div>';
+        }).join('') : `<p class="filterbar-menu-empty">${escapeHtml(t('filter.noMatch'))}</p>`;
+        list.scrollTop = scrollTop;
 
-        facet._menu.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+        list.querySelectorAll('input[type="checkbox"]').forEach((box) => {
             box.addEventListener('change', () => {
                 if (box.checked) facet.selected.add(box.value);
                 else facet.selected.delete(box.value);
@@ -2730,10 +3103,38 @@ function createFilterBar(mount, spec) {
         });
     }
 
+    // « Tout sélectionner » takes what the search left visible; « Tout effacer » empties the whole facet.
+    function wireMenuHead(facet) {
+        const menu = facet._menu;
+        menu.querySelector('.filterbar-menu-search').addEventListener('input', (e) => {
+            facet.query = e.target.value;
+            renderOptions(facet);
+        });
+        const applied = () => {
+            renderButton(facet);
+            renderOptions(facet);
+            renderChips();
+            emit();
+        };
+        menu.querySelector('[data-select-all]').addEventListener('click', () => {
+            visibleOptions(facet).forEach((o) => facet.selected.add(String(o.value)));
+            applied();
+        });
+        menu.querySelector('[data-clear-selection]').addEventListener('click', () => {
+            facet.selected.clear();
+            applied();
+        });
+    }
+
     // ---- chips ----
     function renderChips() {
         const pills = [];
         facets.forEach((facet) => {
+            // Many picks (« Tout sélectionner ») read better as one chip.
+            if (facet.selected.size > CHIPS_PER_FACET) {
+                pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-clear-facet="1">${escapeHtml(t('filter.chipLabel', { label: facet.label }))} ${escapeHtml(t('filter.selectedCount', { n: facet.selected.size }))} ✕</button>`);
+                return;
+            }
             facet.selected.forEach((v) => {
                 pills.push(`<button type="button" class="filterbar-chip" data-facet="${escapeHtml(facet.id)}" data-value="${escapeHtml(String(v))}">${escapeHtml(t('filter.chipLabel', { label: facet.label }))} ${optionLabel(facet, v)} ✕</button>`);
             });
@@ -2747,6 +3148,17 @@ function createFilterBar(mount, spec) {
                 const facet = facetById.get(btn.dataset.facet);
                 if (!facet) return;
                 facet.selected.delete(btn.dataset.value);
+                renderButton(facet);
+                if (openId === facet.id) renderMenu(facet);
+                renderChips();
+                emit();
+            });
+        });
+        chipsEl.querySelectorAll('[data-clear-facet]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const facet = facetById.get(btn.dataset.facet);
+                if (!facet) return;
+                facet.selected.clear();
                 renderButton(facet);
                 if (openId === facet.id) renderMenu(facet);
                 renderChips();
@@ -2829,6 +3241,16 @@ function isNamedPersona(p) {
     return isActivePersona(p) && Boolean(name) && !/^\d+$/.test(name);
 }
 
+// A retired profile's replacement: its `alias_of`, or the active profile that lists
+// it in `aliases`. null when `id` is active or unknown.
+function replacementPersonaId(personas, id) {
+    const list = Array.isArray(personas) ? personas : [];
+    if (list.some((p) => p.id === id && isActivePersona(p))) return null;
+    const old = list.find((p) => p.id === id);
+    const target = list.find((p) => isActivePersona(p) && (p.id === old?.alias_of || (p.aliases || []).includes(id)));
+    return target ? target.id : null;
+}
+
 // Personas can be retired (e.g. the old EVS groups 01–10); never show those.
 function isActivePersona(p) {
     return Boolean(p) && p.status !== 'retired';
@@ -2887,7 +3309,9 @@ function missingArchetypes(a) {
     const covered = new Set((a.personas || []).map((p) => p && p.id));
     const missing = feedArchetypes.filter((p) => !covered.has(p.id));
     const k = missing.length ? (Number(a.id) || 0) % missing.length : 0;
-    return missing.slice(k).concat(missing.slice(0, k));
+    const rotated = missing.slice(k).concat(missing.slice(0, k));
+    // People picked in « Trouver une réponse » come first (e.g. coming from « Pas encore de réponse pour Max »).
+    return rotated.filter((p) => feedPersonaIds.has(p.id)).concat(rotated.filter((p) => !feedPersonaIds.has(p.id)));
 }
 
 function firstName(name) {
@@ -2912,6 +3336,7 @@ async function initRespondPage() {
 
     setupFeedSearch();
     setupModeSwitch();
+    setupHelpMore();
     syncModeUi();
     document.getElementById('feedMore')?.addEventListener('click', () => {
         feedShown += FEED_PAGE_SIZE;
@@ -2931,10 +3356,12 @@ async function initRespondPage() {
         allArguments.forEach((a) => (a.personas || []).forEach((x) => {
             if (x && Number.isInteger(x.id) && !byId.has(x.id)) byId.set(x.id, { id: x.id, name: x.name, emoji: x.emoji });
         }));
+        let allPersonas = [];
         try {
             const personaRes = await fetch(`${API_BASE_URL}/persona-archetypes`);
             const personas = personaRes.ok ? await personaRes.json() : [];
-            (Array.isArray(personas) ? personas : []).forEach((p) => {
+            allPersonas = Array.isArray(personas) ? personas : [];
+            allPersonas.forEach((p) => {
                 if (!isActivePersona(p) || !Number.isInteger(p.id)) return;
                 if (p.accent_color) feedPersonaColors.set(p.id, p.accent_color);
                 if (p.layer === 'archetype' && isNamedPersona(p)) feedArchetypes.push({ id: p.id, name: p.name });
@@ -2944,10 +3371,16 @@ async function initRespondPage() {
         feedPersonaList = Array.from(byId.values())
             .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), LANG));
 
-        // Drop any seeded id that matches no known persona.
-        feedPersonaIds = new Set([...feedPersonaIds].filter((id) => byId.has(id)));
+        // Old profile ids in ?persona= (retired groups) become the profile that replaced them;
+        // then drop any id that matches no known persona.
+        const before = [...feedPersonaIds].join(',');
+        feedPersonaIds = new Set([...feedPersonaIds]
+            .map((id) => replacementPersonaId(allPersonas, id) ?? id)
+            .filter((id) => byId.has(id)));
+        if ([...feedPersonaIds].join(',') !== before) syncFeedUrl();
 
         if (loadingMessage) loadingMessage.style.display = 'none';
+        renderFeedStats();
 
         // Offer every named persona (the archetypes), even before they have an
         // answer, plus any other named persona that appears on a claim.
@@ -2965,6 +3398,7 @@ async function initRespondPage() {
     } catch (error) {
         console.error('Error loading narratives:', error);
         if (loadingMessage) loadingMessage.style.display = 'none';
+        document.getElementById('feedStats')?.style.setProperty('display', 'none');
         if (errorMessage) {
             errorMessage.textContent = t('feed.loadError');
             errorMessage.style.display = 'block';
@@ -3005,6 +3439,18 @@ function renderTopicChips(topics) {
     renderFeedFilters();
 }
 
+// Key figures above the feed: totals, so they stay put while filters change.
+function renderFeedStats() {
+    const el = document.getElementById('feedStats');
+    if (!el) return;
+    const answers = allArguments.reduce((sum, a) => sum + (a.counter_argument_count || 0), 0);
+    el.innerHTML = statTilesHtml([
+        { n: allArguments.length, label: t('home.statClaims', { n: allArguments.length }) },
+        { n: answers, label: t('home.statAnswers', { n: answers }) },
+        { n: feedArchetypes.length, label: t('home.statProfiles', { n: feedArchetypes.length }) },
+    ].filter((tile) => tile.n > 0));
+}
+
 function setupModeSwitch() {
     const sw = document.getElementById('modeSwitch');
     if (!sw) return;
@@ -3030,11 +3476,21 @@ function syncModeUi() {
     if (helpEl) helpEl.hidden = !help;
     if (more) more.hidden = !help;
     document.getElementById('argumentsList')?.classList.toggle('is-help', help);
-    // The header's « Participer » opens this page in help mode: mark the right item.
-    const nav = document.getElementById('siteLinks');
-    nav?.querySelector('a[data-i18n="nav.debunk"]')?.toggleAttribute('aria-current', !help);
-    nav?.querySelector('a[data-i18n="nav.contribute"]')?.toggleAttribute('aria-current', help);
-    nav?.querySelectorAll('[aria-current]').forEach((el) => el.setAttribute('aria-current', 'page'));
+}
+
+// « Plus de façons de contribuer → » opens the profile. Visitors have no profile yet:
+// say what an account adds, with « Créer un compte » / « Se connecter ».
+function setupHelpMore() {
+    const el = document.getElementById('helpMore');
+    if (!el || currentUser) return;
+    const next = 'profile.html#contributeSection';
+    el.classList.add('help-more-guest');
+    el.innerHTML = `
+        <span>${escapeHtml(t('help.moreGuest'))}</span>
+        <span class="help-more-actions">
+            <a class="btn btn-primary btn-small" href="register.html?next=${encodeURIComponent(next)}">${escapeHtml(t('common.createAccount'))}</a>
+            <a class="btn btn-secondary btn-small" href="login.html?next=${encodeURIComponent(next)}">${escapeHtml(t('common.login'))}</a>
+        </span>`;
 }
 
 // Help-out task picker: one button per task, with how many claims need it.
@@ -3193,6 +3649,7 @@ function renderArgumentsList() {
             list.innerHTML = `<p class="feed-empty">${escapeHtml(t('help.empty'))}</p>`;
             if (emptyMessage) emptyMessage.style.display = 'none';
         } else if (emptyMessage) {
+            renderFeedEmpty(emptyMessage);
             emptyMessage.style.display = 'block';
         }
         return;
@@ -3200,6 +3657,35 @@ function renderArgumentsList() {
     if (emptyMessage) emptyMessage.style.display = 'none';
 
     items.slice(0, feedShown).forEach((a) => list.appendChild(help ? createHelpCard(a, helpTask) : createFeedCard(a)));
+}
+
+// Empty feed. When the only reason is the people picked (a profile with no answer
+// yet), say so and point to « Contribuer → Écrire une réponse »; otherwise offer to add the claim.
+function renderFeedEmpty(el) {
+    if (!el.dataset.defaultHtml) el.dataset.defaultHtml = el.innerHTML;
+    const blockedByPeople = feedPersonaIds.size > 0 && filteredFeedItems({ ignorePersonas: true }).length > 0;
+    if (!blockedByPeople) {
+        // Put the default message back (its button loses its listener, so re-wire it).
+        if (el.innerHTML !== el.dataset.defaultHtml) {
+            el.innerHTML = el.dataset.defaultHtml;
+            el.querySelectorAll('[data-open-composer]').forEach((b) => {
+                b.onclick = () => document.getElementById('feedComposerToggle')?.click();
+            });
+        }
+        return;
+    }
+    const names = feedPersonaChoices.filter((p) => feedPersonaIds.has(p.id)).map((p) => p.name);
+    el.innerHTML = `
+        <p>${escapeHtml(t('home.emptyPersona', { names: names.join(t('home.or')) }))}</p>
+        <p class="feed-empty-hint">${escapeHtml(t('home.emptyPersonaHint'))}</p>
+        <button type="button" class="btn btn-primary" data-help-write>${icon('pen')} ${escapeHtml(t('home.emptyPersonaCta'))}</button>`;
+    el.querySelector('[data-help-write]').onclick = () => {
+        feedMode = 'help';
+        helpTask = 'write';
+        syncModeUi();
+        refreshFeed();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 }
 
 // Help-out card: why this claim needs help, the claim, and one action.
@@ -3340,6 +3826,16 @@ async function initArgumentDetailPage() {
             fetch(`${API_BASE_URL}/arguments/${id}`, { credentials: 'include' }),
             fetch(`${API_BASE_URL}/persona-archetypes`),
         ]);
+        if (argRes.status === 404) {
+            if (loading) loading.style.display = 'none';
+            if (errorEl) {
+                errorEl.className = 'not-found';
+                errorEl.innerHTML = `<h2>${escapeHtml(t('claim.notFound'))}</h2><p>${t('claim.notFoundHtml')}</p>`;
+                errorEl.style.display = 'block';
+            }
+            document.title = t('site.pageTitle', { page: t('claim.notFound') });
+            return;
+        }
         if (!argRes.ok) throw new Error('Failed to load narrative');
 
         const data = await argRes.json();
@@ -3357,8 +3853,19 @@ async function initArgumentDetailPage() {
         initComposer();
 
         // Deep link from the Contribute page: ?write=<personaId> (or ?write=any) opens the composer.
+        // A draft kept when the session expired comes back here, even if the link lost its ?write=.
         const write = params.get('write');
-        if (write) openComposer(id, /^\d+$/.test(write) ? Number(write) : '');
+        const draft = currentUser ? takeComposerDraft(id) : null;
+        if (write || draft) {
+            const personaId = draft?.personaId ?? writePersonaId(write);
+            openComposer(id, personaId, draft?.text || '', { draft: Boolean(draft) });
+            if (draft) {
+                fillComposerSources(draft.sources);
+                document.getElementById('composerText')?.focus();
+                showToast(t('composer.draftRestored'));
+                scheduleAccountDraftSave();
+            }
+        }
 
         // Deep link from the home feed's "Rate an answer": ?rate=1 opens the first response's stars.
         if (params.get('rate')) {
@@ -3441,7 +3948,7 @@ function renderResponses() {
 
     list.innerHTML = '';
     if (!cas.length) {
-        list.innerHTML = `<div class="empty-message"><p>${escapeHtml(t('claim.emptyForProfile'))}</p>
+        list.innerHTML = `<div class="empty-message"><p>${escapeHtml(t(filterId ? 'claim.emptyForProfile' : 'claim.emptyAll'))}</p>
             <button type="button" class="btn btn-primary" onclick="openComposer(${argDetailState.argumentId}, '${filterId}')">${escapeHtml(t('claim.writeFirst'))}</button></div>`;
         return;
     }
@@ -3453,17 +3960,14 @@ function createResponseCard(ca) {
     const persona = ca.persona_archetype;
     const personaId = persona && persona.id != null ? persona.id : '';
     const personaName = persona ? (persona.name || t('personas.fallbackName')) : t('response.general');
-    const framing = persona && persona.description ? ` · ${persona.description}` : '';
+    const label = personaLabel(persona);
+    const framing = label ? ` · ${label}` : '';
 
     const text = String(ca.text || '');
     const isLong = text.length > 320;
     const shownText = isLong ? text.slice(0, 320) + '…' : text;
 
-    const avg = (typeof ca.avg_score === 'number') ? ca.avg_score : null;
-    const ratingCount = ca.rating_count || 0;
-    const ratingHtml = avg != null
-        ? `<span class="trust-item" title="${escapeHtml(t('response.ratingTitle', { avg: formatNumber(avg, 1), n: ratingCount }))}">${renderStars(avg)} <span class="rating-count">(${ratingCount})</span></span>`
-        : `<span class="trust-item trust-muted">${escapeHtml(t('response.notRated'))}</span>`;
+    const ratingHtml = ratingTrustHtml(ca);
 
     const resources = Array.isArray(ca.resources) && ca.resources.length
         ? ca.resources
@@ -3495,7 +3999,7 @@ function createResponseCard(ca) {
         <div class="response-trust">${sourceHtml}${sourceStampHtml(check)}${ratingHtml}</div>
         <div class="response-actions">
             <button type="button" class="btn btn-secondary btn-small response-copy">${icon('copy')} ${escapeHtml(t('response.copy'))}</button>
-            <button type="button" class="btn btn-secondary btn-small response-rate">★ ${escapeHtml(t('response.rate'))}</button>
+            <button type="button" class="btn btn-secondary btn-small response-rate">★ ${escapeHtml(myRatingFor(ca, personaId) ? t('response.myRating', { n: myRatingFor(ca, personaId) }) : t('response.rate'))}</button>
             <button type="button" class="btn btn-secondary btn-small response-improve">${icon('pen')} ${escapeHtml(t('response.improve'))}</button>
             ${checkBtnHtml}
         </div>
@@ -3536,7 +4040,7 @@ function createResponseCard(ca) {
         rateRow.style.display = isHidden ? 'flex' : 'none';
         rateRow.setAttribute('aria-hidden', isHidden ? 'false' : 'true');
         if (isHidden && !rateRow.dataset.built) {
-            buildRateRow(rateRow, ca.id, personaId);
+            buildRateRow(rateRow, ca, personaId, card);
             rateRow.dataset.built = '1';
         }
     });
@@ -3640,8 +4144,26 @@ async function submitSourceCheck(counterArgumentId, verdict, note, row) {
     }
 }
 
-function buildRateRow(rateRow, counterArgumentId, personaId) {
-    rateRow.innerHTML = `<span class="rate-label">${escapeHtml(t('rate.prompt'))}</span>`;
+// The subtitle of a profile (« La tante conservatrice »), the same everywhere.
+function personaLabel(p) {
+    return String(p?.short_label || p?.description || '').trim();
+}
+
+function lowerFirst(text) {
+    const s = String(text || '');
+    return s.charAt(0).toLocaleLowerCase(LOCALE) + s.slice(1);
+}
+
+// The viewer's own score for this answer and profile (null profile = « Tout le monde »).
+function myRatingFor(ca, personaId) {
+    const pid = personaId === '' || personaId == null ? null : Number(personaId);
+    const entry = (ca.my_ratings || []).find((r) => (r.persona_archetype_id ?? null) === pid);
+    return Number(entry ? entry.score : ca.my_score) || 0;
+}
+
+function buildRateRow(rateRow, ca, personaId, card) {
+    const mine = myRatingFor(ca, personaId);
+    rateRow.innerHTML = `<span class="rate-label">${escapeHtml(mine ? t('rate.promptChange', { n: mine }) : t('rate.prompt'))}</span>`;
     const starWrap = document.createElement('span');
     starWrap.className = 'rate-stars';
     for (let i = 1; i <= 5; i++) {
@@ -3650,12 +4172,14 @@ function buildRateRow(rateRow, counterArgumentId, personaId) {
         star.className = 'rate-star';
         star.textContent = '★';
         star.setAttribute('aria-label', t('rate.star', { n: i }));
+        star.setAttribute('aria-pressed', String(i === mine));
         star.addEventListener('mouseenter', () => highlightStars(starWrap, i));
-        star.addEventListener('mouseleave', () => highlightStars(starWrap, 0));
-        star.addEventListener('click', () => submitRating(counterArgumentId, personaId, i, rateRow));
+        star.addEventListener('mouseleave', () => highlightStars(starWrap, mine));
+        star.addEventListener('click', () => submitRating(ca, personaId, i, rateRow, card));
         starWrap.appendChild(star);
     }
     rateRow.appendChild(starWrap);
+    highlightStars(starWrap, mine);
 }
 
 function highlightStars(starWrap, upTo) {
@@ -3664,9 +4188,11 @@ function highlightStars(starWrap, upTo) {
     });
 }
 
-async function submitRating(counterArgumentId, personaId, score, rateRow) {
+async function submitRating(ca, personaId, score, rateRow, card) {
+    // A visitor's vote waits unattached, so the API can't say it replaced one: we know it did.
+    const hadRating = myRatingFor(ca, personaId) > 0;
     try {
-        const body = { counter_argument_id: counterArgumentId, score };
+        const body = { counter_argument_id: ca.id, score };
         if (personaId !== '' && personaId != null) body.persona_archetype_id = Number(personaId);
 
         const res = await fetch(`${API_BASE_URL}/effectiveness-ratings`, {
@@ -3677,7 +4203,21 @@ async function submitRating(counterArgumentId, personaId, score, rateRow) {
         });
         const data = await res.json();
         if (res.ok) {
-            rateRow.innerHTML = `<span class="rate-thanks">${escapeHtml(t('rate.thanks', { n: score }))}</span>`;
+            rateRow.innerHTML = `<span class="rate-thanks">${escapeHtml(t(data.replaced || (data.pending && hadRating) ? 'rate.updated' : 'rate.thanks', { n: score }))}</span>`;
+            delete rateRow.dataset.built;
+            ca.my_score = score;
+            const pid = personaId === '' || personaId == null ? null : Number(personaId);
+            ca.my_ratings = (ca.my_ratings || []).filter((r) => (r.persona_archetype_id ?? null) !== pid)
+                .concat({ persona_archetype_id: pid, score, pending: Boolean(data.pending) });
+            const rateBtn = card?.querySelector('.response-rate');
+            if (rateBtn) rateBtn.textContent = `★ ${t('response.myRating', { n: score })}`;
+            // Signed-in ratings count right away: show the new average.
+            const trust = card?.querySelector('.response-trust > .trust-item:last-child');
+            if (trust && typeof data.avg_score === 'number') {
+                ca.avg_score = data.avg_score;
+                ca.rating_count = data.rating_count || 0;
+                trust.outerHTML = ratingTrustHtml(ca);
+            }
             if (data.pending) {
                 pendingVotes = data.pending_count;
                 showToast(t('votes.pendingToast', { n: data.pending_count }),
@@ -3692,6 +4232,15 @@ async function submitRating(counterArgumentId, personaId, score, rateRow) {
         console.error('Rating error:', error);
         showToast(t('rate.networkError'));
     }
+}
+
+// Average stars and number of ratings (last item of the card's trust line).
+function ratingTrustHtml(ca) {
+    const avg = (typeof ca.avg_score === 'number') ? ca.avg_score : null;
+    const n = ca.rating_count || 0;
+    return avg != null
+        ? `<span class="trust-item" title="${escapeHtml(t('response.ratingTitle', { avg: formatNumber(avg, 1), n }))}">${renderStars(avg)} <span class="rating-count">(${n})</span></span>`
+        : `<span class="trust-item trust-muted">${escapeHtml(t('response.notRated'))}</span>`;
 }
 
 function renderStars(avg) {
@@ -3749,17 +4298,31 @@ function initComposer() {
                 .join('');
     }
 
-    document.getElementById('composerAddSource')?.addEventListener('click', addComposerSourceInput);
+    document.getElementById('composerAddSource')?.addEventListener('click', () => addComposerSourceInput());
     document.getElementById('composerClose')?.addEventListener('click', closeComposer);
     document.getElementById('composerCancel')?.addEventListener('click', closeComposer);
     document.getElementById('composerBackdrop')?.addEventListener('click', closeComposer);
     document.getElementById('composerForm')?.addEventListener('submit', submitComposer);
+    // Changing who you answer updates the title and the tip, and moves the draft.
+    composerPersona?.addEventListener('change', () => {
+        syncComposerHint(composerPersona.value);
+        if (composerIsBlank()) restoreAccountDraft(argDetailState.argumentId, composerPersonaId());
+        else scheduleAccountDraftSave();
+    });
+    document.getElementById('composerForm')?.addEventListener('input', (e) => {
+        if (e.target !== composerPersona) scheduleAccountDraftSave();
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeComposer();
     });
+    // Leaving the page (or the tab going to the background on a phone) saves right away.
+    window.addEventListener('pagehide', () => saveAccountDraft({ keepalive: true }));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') saveAccountDraft({ keepalive: true });
+    });
 }
 
-function addComposerSourceInput(value = '') {
+function addComposerSourceInput(value = '', { focus = true } = {}) {
     const container = document.getElementById('composerSources');
     if (!container) return;
     const input = document.createElement('input');
@@ -3768,7 +4331,15 @@ function addComposerSourceInput(value = '') {
     input.placeholder = t('composer.sourcePlaceholder');
     input.value = value;
     container.appendChild(input);
-    input.focus();
+    if (focus) input.focus();
+}
+
+function fillComposerSources(urls) {
+    resetComposerSources();
+    (urls || []).forEach((url, i) => {
+        if (i === 0) document.querySelector('.composer-source-input').value = url;
+        else addComposerSourceInput(url, { focus: false });
+    });
 }
 
 function resetComposerSources() {
@@ -3777,33 +4348,32 @@ function resetComposerSources() {
     container.innerHTML = `<input type="url" class="composer-source-input" placeholder="${escapeHtml(t('composer.sourcePlaceholder'))}">`;
 }
 
-function openComposer(argumentId, personaId = '', prefillText = '') {
-    if (!currentUser) {
-        showToast(t('composer.loginToast'), { actionLabel: t('common.login'), actionHref: authHref() });
+function openComposer(argumentId, personaId = '', prefillText = '', { draft = false } = {}) {
+    // Session expired with text kept for this person: the form comes back with it, ready for login.
+    const kept = !currentUser && !prefillText ? keptComposerDraftFor(argumentId, personaId) : null;
+    if (!currentUser && !kept) {
+        // After logging in or signing up, the form opens again for the same person.
+        const write = (personaId !== '' && personaId != null) ? personaId : 'any';
+        showToast(t('composer.loginToast'), { actions: authToastActions({ write }), duration: 10000 });
         return;
     }
     const panel = document.getElementById('composerPanel');
     const backdrop = document.getElementById('composerBackdrop');
     const personaSelect = document.getElementById('composerPersona');
-    const hint = document.getElementById('composerHint');
-    const title = document.getElementById('composerTitle');
     const message = document.getElementById('composerMessage');
 
     if (personaSelect) personaSelect.value = (personaId !== '' && personaId != null) ? String(personaId) : '';
-    document.getElementById('composerText').value = prefillText || '';
+    document.getElementById('composerText').value = kept ? kept.text : (prefillText || '');
     resetComposerSources();
+    if (kept) fillComposerSources(kept.sources);
     showComposerSourceError(false);
     if (message) { message.textContent = ''; message.className = 'form-message'; }
 
-    const persona = argDetailState.personas.find((p) => String(p.id) === String(personaId));
-    if (persona && persona.description) {
-        title.textContent = t('composer.titleFor', { name: persona.name });
-        hint.textContent = t('composer.hint', { name: persona.name, description: String(persona.description).replace(/[.\s]+$/, '') });
-        hint.style.display = 'block';
-    } else {
-        title.textContent = t(prefillText ? 'composer.titleImprove' : 'composer.title');
-        hint.style.display = 'none';
-    }
+    syncComposerHint(personaId, Boolean(prefillText) && !draft);
+
+    resetAccountDraftState(argumentId, draft || kept ? '' : prefillText);
+    composerDraftState.open = true;
+    composerDraftState.returnFocus = document.activeElement;
 
     if (backdrop) backdrop.style.display = 'block';
     if (panel) {
@@ -3811,10 +4381,279 @@ function openComposer(argumentId, personaId = '', prefillText = '') {
         panel.setAttribute('aria-hidden', 'false');
         panel.classList.add('is-open');
     }
-    document.getElementById('composerText').focus();
+    setPageBehindComposer(true);
+    document.getElementById(personaSelect && !personaSelect.value ? 'composerPersona' : 'composerText').focus();
+    if (kept) {
+        composerDraftState.expired = true;
+        showComposerSessionExpired(kept.personaId);
+    } else if (!draft) {
+        restoreAccountDraft(argumentId, composerPersonaId());
+    }
+}
+
+// ?write=<id> from old links can name a retired profile: answer its replacement.
+function writePersonaId(write) {
+    if (!/^\d+$/.test(write || '')) return '';
+    const id = Number(write);
+    const resolved = replacementPersonaId(argDetailState.personas, id) ?? id;
+    return argDetailState.namedPersonas.some((p) => p.id === resolved) ? resolved : '';
+}
+
+// While the dialog is open, the page behind it can't be scrolled, clicked or tabbed to.
+function setPageBehindComposer(covered) {
+    document.documentElement.classList.toggle('composer-open', covered);
+    document.querySelectorAll('body > header, body > main, body > footer').forEach((el) => { el.inert = covered; });
+}
+
+// Title and tip for the person being answered: « Vous répondez à Max Onnousment,
+// le révolté anti-système. » + the profile's persuasion approach.
+function syncComposerHint(personaId, improving = false) {
+    const hint = document.getElementById('composerHint');
+    const title = document.getElementById('composerTitle');
+    const persona = argDetailState.personas.find((p) => String(p.id) === String(personaId));
+    if (title) {
+        title.textContent = persona && !improving
+            ? t('composer.titleFor', { name: persona.name })
+            : t(improving ? 'composer.titleImprove' : 'composer.title');
+    }
+    if (!hint) return;
+    if (!persona) {
+        hint.style.display = 'none';
+        return;
+    }
+    const label = personaLabel(persona).replace(/[.\s]+$/, '');
+    const intro = label ? t('composer.hint', { name: persona.name, label: lowerFirst(label) }) : persona.name;
+    const approach = String(persona.persuasion?.approach || '').trim();
+    hint.innerHTML = escapeHtml(intro) + (approach
+        ? `<span class="composer-hint-tip"><strong>${escapeHtml(t('composer.hintApproach'))}</strong> ${escapeHtml(approach)}</span>`
+        : '');
+    hint.style.display = 'block';
+}
+
+// Answer drafts survive an expired session: kept for this tab, restored after login.
+const COMPOSER_DRAFT_KEY = 'reinform.answerDraft';
+
+// Nothing typed means nothing to keep (and an older copy shouldn't come back).
+function saveComposerDraft(draft) {
+    try {
+        if (draft.text || draft.sources.length) sessionStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft));
+        else sessionStorage.removeItem(COMPOSER_DRAFT_KEY);
+    } catch (_) { /* private mode */ }
+}
+
+function readComposerDraft(argumentId) {
+    try {
+        const draft = JSON.parse(sessionStorage.getItem(COMPOSER_DRAFT_KEY) || 'null');
+        return draft && draft.argumentId === argumentId ? draft : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function takeComposerDraft(argumentId) {
+    const draft = readComposerDraft(argumentId);
+    if (draft) {
+        try { sessionStorage.removeItem(COMPOSER_DRAFT_KEY); } catch (_) { /* private mode */ }
+    }
+    return draft;
+}
+
+// The kept text, if it was written for this person (« Écrire pour… » chip).
+function keptComposerDraftFor(argumentId, personaId) {
+    const draft = readComposerDraft(argumentId);
+    const wanted = personaId === '' || personaId == null ? null : Number(personaId);
+    return draft && (draft.personaId ?? null) === wanted ? draft : null;
+}
+
+// Session expired while writing: keep the text in this tab, show the visitor header,
+// and offer a login that comes back here with the form open.
+function composerSessionExpired(sent) {
+    const state = composerDraftState;
+    // The form may hold more than was sent; unchanged « improve » text reads as empty there.
+    const live = state.open ? composerDraftContent() : null;
+    const kept = live && (live.text || live.sources.length) ? { ...live, argumentId: state.argumentId } : sent;
+    saveComposerDraft(kept);
+    currentUser = null;
+    updateNavForLoggedOutUser();
+    if (state.open) {
+        state.expired = true;
+        showComposerSessionExpired(kept.personaId);
+    } else {
+        // Form already closed (saved on Esc): the form's own message can't be seen.
+        showToast(t('composer.sessionExpired'), {
+            actionLabel: t('common.login'),
+            actionHref: authHrefWith('login.html', { write: kept.personaId ?? 'any' }),
+            duration: 10000,
+        });
+    }
+}
+
+function showComposerSessionExpired(personaId) {
+    const message = document.getElementById('composerMessage');
+    setDraftStatus('');
+    if (!message) return;
+    message.innerHTML = t('composer.sessionExpiredHtml', {
+        loginHref: escapeHtml(authHrefWith('login.html', { write: personaId ?? 'any' })),
+    });
+    message.className = 'form-message error';
+    message.scrollIntoView({ block: 'nearest' });
+}
+
+// Answer drafts saved to the account: while typing (2 s pause), on close, and on
+// leaving the page. One draft per claim × person; `null` is « Tout le monde ».
+const DRAFT_SAVE_DELAY = 2000;
+const composerDraftState = {
+    open: false, frozen: false, expired: false, baseline: '', argumentId: null, lastSerial: '',
+    draftId: null, savedPersonaId: null, timer: null, inflight: null, loadToken: 0, returnFocus: null,
+};
+
+function resetAccountDraftState(argumentId, baseline) {
+    clearTimeout(composerDraftState.timer);
+    composerDraftState.loadToken += 1;
+    Object.assign(composerDraftState, {
+        frozen: false, expired: false, baseline: String(baseline || '').trim(), argumentId,
+        lastSerial: '', draftId: null, savedPersonaId: null,
+    });
+    setDraftStatus('');
+}
+
+function composerPersonaId() {
+    const value = document.getElementById('composerPersona')?.value;
+    return value ? Number(value) : null;
+}
+
+function composerSources() {
+    return Array.from(document.querySelectorAll('.composer-source-input'))
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+}
+
+// What would go in the draft. Unchanged text from « improve this answer » isn't theirs yet.
+function composerDraftContent() {
+    const value = document.getElementById('composerText').value.trim();
+    const text = (composerDraftState.baseline && value === composerDraftState.baseline) ? '' : value;
+    return { personaId: composerPersonaId(), text, sources: composerSources() };
+}
+
+function composerIsBlank() {
+    const { text, sources } = composerDraftContent();
+    return !text && !sources.length;
+}
+
+function setDraftStatus(text, isError = false) {
+    const el = document.getElementById('composerDraftStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('is-error', isError);
+}
+
+function scheduleAccountDraftSave() {
+    setDraftStatus('');
+    clearTimeout(composerDraftState.timer);
+    composerDraftState.timer = setTimeout(() => saveAccountDraft(), DRAFT_SAVE_DELAY);
+}
+
+function saveAccountDraft({ keepalive = false } = {}) {
+    const state = composerDraftState;
+    clearTimeout(state.timer);
+    // Session gone: whatever they're still typing stays in this tab for after login.
+    if (state.open && state.expired) {
+        saveComposerDraft({ ...composerDraftContent(), argumentId: state.argumentId });
+        return;
+    }
+    if (!state.open || state.frozen || !currentUser) return;
+
+    const { personaId, text, sources } = composerDraftContent();
+    const serial = JSON.stringify([personaId, text, sources]);
+    if (serial === state.lastSerial) return;
+    const empty = !text && !sources.length;
+    if (empty && state.draftId == null) { state.lastSerial = serial; return; }
+    state.lastSerial = serial;
+
+    // Moved to another person: the draft under the previous one goes away.
+    if (state.draftId != null && state.savedPersonaId !== personaId) {
+        deleteDraft(state.draftId, { keepalive }).catch(() => {});
+        state.draftId = null;
+    }
+
+    const argumentId = state.argumentId;
+    state.inflight = (async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/me/drafts`, {
+                method: 'PUT',
+                keepalive,
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ argument_id: argumentId, persona_archetype_id: personaId, text, sources }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) {
+                composerSessionExpired({ argumentId, personaId, text, sources });
+            } else if (!res.ok) {
+                setDraftStatus(apiError(data, 'composer.draftError'), true);
+            } else {
+                state.draftId = data.draft ? data.draft.id : null;
+                state.savedPersonaId = data.draft ? personaId : null;
+                if (data.draft && serial === state.lastSerial) setDraftStatus(t('composer.draftSaved'));
+            }
+        } catch (_) {
+            state.lastSerial = ''; // try again at the next save
+        }
+    })();
+}
+
+function deleteDraft(id, { keepalive = false } = {}) {
+    return fetch(`${API_BASE_URL}/me/drafts/${encodeURIComponent(id)}`, { method: 'DELETE', keepalive, credentials: 'include' });
+}
+
+// Sources only ever go back into text fields; safeHref still drops any odd scheme.
+function draftSourceUrls(draft) {
+    return (Array.isArray(draft.sources) ? draft.sources : [])
+        .map((s) => safeHref(typeof s === 'string' ? s : s?.url))
+        .filter(Boolean);
+}
+
+// Bring back the saved draft for this claim × person, unless they've started typing meanwhile.
+async function restoreAccountDraft(argumentId, personaId) {
+    const state = composerDraftState;
+    if (!currentUser) return;
+    const token = ++state.loadToken;
+    const before = JSON.stringify(composerDraftContent());
+    try {
+        await state.inflight;
+        const res = await fetch(`${API_BASE_URL}/me/drafts`, { credentials: 'include' });
+        if (!res.ok) return;
+        const { drafts } = await res.json();
+        if (token !== state.loadToken || !state.open || JSON.stringify(composerDraftContent()) !== before) return;
+        const draft = (drafts || []).find((d) => d.argument_id === argumentId && (d.persona_archetype_id ?? null) === personaId);
+        if (!draft) return;
+
+        document.getElementById('composerText').value = draft.text || '';
+        fillComposerSources(draftSourceUrls(draft));
+        state.baseline = '';
+        state.draftId = draft.id;
+        state.savedPersonaId = personaId;
+        const { text, sources } = composerDraftContent();
+        state.lastSerial = JSON.stringify([personaId, text, sources]);
+        syncComposerHint(personaId ?? '');
+        showToast(t('composer.draftRestored'));
+    } catch (_) { /* no draft shown, nothing lost */ }
+}
+
+// The form is done with: a reload shouldn't open it again.
+function removeWriteFromUrl() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('write')) return;
+    url.searchParams.delete('write');
+    history.replaceState(history.state, '', url);
 }
 
 function closeComposer() {
+    if (!composerDraftState.open) return;
+    saveAccountDraft({ keepalive: true });
+    composerDraftState.open = false;
+    composerDraftState.loadToken += 1;
+    removeWriteFromUrl();
     const panel = document.getElementById('composerPanel');
     const backdrop = document.getElementById('composerBackdrop');
     if (panel) {
@@ -3823,6 +4662,9 @@ function closeComposer() {
         panel.setAttribute('aria-hidden', 'true');
     }
     if (backdrop) backdrop.style.display = 'none';
+    setPageBehindComposer(false);
+    const back = composerDraftState.returnFocus;
+    if (back && back !== document.body && back.isConnected) back.focus({ preventScroll: true });
 }
 
 // What the backend accepts as a source: an absolute http(s) address.
@@ -3887,7 +4729,11 @@ async function submitComposer(e) {
 
     submitBtn.disabled = true;
     submitBtn.textContent = t('composer.publishing');
+    // No autosave from here on, so a late one can't bring the draft back after publishing.
+    composerDraftState.frozen = true;
+    clearTimeout(composerDraftState.timer);
     try {
+        await composerDraftState.inflight;
         const res = await fetch(`${API_BASE_URL}/counter-arguments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3896,17 +4742,28 @@ async function submitComposer(e) {
         });
         const data = await res.json();
         if (res.ok) {
+            // The server clears the draft for this person; one kept under another
+            // person or « Tout le monde » is ours to remove.
+            const { draftId, savedPersonaId } = composerDraftState;
+            if (draftId != null && savedPersonaId !== body.persona_archetype_id) deleteDraft(draftId).catch(() => {});
+            takeComposerDraft(body.argument_id); // published: a kept copy must not come back
             closeComposer();
             showToast(t('composer.published'));
             await reloadArgumentDetail();
-        } else if (isLinkError(data)) {
+            return;
+        }
+        composerDraftState.frozen = false;
+        if (isLinkError(data)) {
             showComposerSourceError(true);
+        } else if (isAuthRequired(res, data)) {
+            composerSessionExpired({ argumentId: body.argument_id, personaId: body.persona_archetype_id, text, sources });
         } else {
             message.textContent = apiError(data, 'composer.error');
             message.className = 'form-message error';
         }
     } catch (error) {
         console.error('Composer error:', error);
+        composerDraftState.frozen = false;
         message.textContent = t('common.networkError');
         message.className = 'form-message error';
     } finally {
@@ -4577,7 +5434,7 @@ async function initLibraryPage() {
         libraryBar = createFilterBar(document.getElementById('libraryControls'), {
             facets: [
                 { id: 'type', label: t('filter.type'), icon: icon('file'), options: libraryFacetOptions('type'), selected: [...libraryState.type] },
-                { id: 'topic', label: t('filter.topic'), icon: icon('tag'), options: libraryFacetOptions('topic') },
+                { id: 'topic', label: t('filter.topic'), icon: icon('tag'), options: libraryFacetOptions('topic'), searchable: true, searchPlaceholder: t('filter.searchTopics') },
                 { id: 'publisher', label: t('filter.publisher'), icon: icon('building'), options: libraryFacetOptions('publisher') },
             ],
             sort: {
@@ -4687,8 +5544,13 @@ function renderLibraryStats(resources) {
         { n: publishers.size, label: t('library.statPublishers', { n: publishers.size }) },
         { n: cited, label: t('library.statCited', { n: cited }) },
     ];
-    statsEl.innerHTML = tiles
-        .map((t) => `<div class="stat-tile"><span class="stat-n">${t.n}</span><span class="stat-label">${escapeHtml(t.label)}</span></div>`)
+    statsEl.innerHTML = statTilesHtml(tiles);
+}
+
+// Big number + small label, shared by the library and the home feed.
+function statTilesHtml(tiles) {
+    return tiles
+        .map((tile) => `<div class="stat-tile"><span class="stat-n">${tile.n}</span><span class="stat-label">${escapeHtml(tile.label)}</span></div>`)
         .join('');
 }
 

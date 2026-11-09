@@ -56,7 +56,9 @@
         // Links: [text](url)
         html = html.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (match, label, url) => {
             const safeLabel = label;
-            const safeUrl = url.replace(/"/g, '%22');
+            // Only web and on-site links (no javascript: and the like).
+            const safeUrl = safeHref(url.replace(/"/g, '%22'));
+            if (!safeUrl) return safeLabel;
             const isHttp = /^https?:\/\//i.test(safeUrl);
             const target = isHttp ? ' target="_blank" rel="noopener noreferrer"' : '';
             return `<a href="${safeUrl}"${target}>${safeLabel}</a>`;
@@ -74,6 +76,33 @@
         return html;
     }
 
+    // Table separator line, e.g. "| --- | :---: |".
+    const TABLE_SEPARATOR = /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/;
+
+    function tableCells(line) {
+        return line.trim().replace(/^\|/, '').replace(/\|$/, '')
+            .split(/(?<!\\)\|/)
+            .map((cell) => cell.trim().replace(/\\\|/g, '|'));
+    }
+
+    function tableToHtml(headerLine, separatorLine, rowLines) {
+        const aligns = tableCells(separatorLine).map((cell) => {
+            const left = cell.startsWith(':');
+            const right = cell.endsWith(':');
+            if (left && right) return ' style="text-align:center"';
+            if (right) return ' style="text-align:right"';
+            return '';
+        });
+        const headers = tableCells(headerLine);
+        const cellHtml = (tag, text, col) => `<${tag}${aligns[col] || ''}>${inlineMarkdownToHtml(text)}</${tag}>`;
+        const head = headers.map((text, col) => cellHtml('th', text, col)).join('');
+        const body = rowLines.map((line) => {
+            const cells = tableCells(line);
+            return `<tr>${headers.map((_, col) => cellHtml('td', cells[col] || '', col)).join('')}</tr>`;
+        }).join('');
+        return `<div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
     function markdownToHtml(markdown) {
         const raw = String(markdown || '');
         const escaped = escapeHtml(raw);
@@ -82,8 +111,18 @@
         let html = '';
         let inUl = false;
         let inOl = false;
+        // Quotes: consecutive "> …" lines make one <blockquote>; a bare ">" splits paragraphs.
+        let quote = null;
+
+        function closeQuote() {
+            if (!quote) return;
+            const paras = quote.join('\n').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+            html += `<blockquote>${paras.map((p) => `<p>${inlineMarkdownToHtml(p.replace(/\n/g, ' '))}</p>`).join('')}</blockquote>`;
+            quote = null;
+        }
 
         function closeLists() {
+            closeQuote();
             if (inUl) {
                 html += '</ul>';
                 inUl = false;
@@ -97,6 +136,33 @@
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
+
+            // Blockquote (the text is already escaped, so ">" is "&gt;")
+            const q = /^&gt;\s?(.*)$/.exec(trimmed);
+            if (q) {
+                if (!quote) {
+                    closeLists();
+                    quote = [];
+                }
+                quote.push(q[1]);
+                continue;
+            }
+            closeQuote();
+
+            // Table: a line with "|" followed by a separator line
+            const nextLine = (lines[i + 1] || '').trim();
+            if (trimmed.includes('|') && nextLine.includes('|') && TABLE_SEPARATOR.test(nextLine)) {
+                closeLists();
+                const rows = [];
+                let j = i + 2;
+                while (j < lines.length && lines[j].trim() && lines[j].includes('|')) {
+                    rows.push(lines[j]);
+                    j++;
+                }
+                html += tableToHtml(trimmed, nextLine, rows);
+                i = j - 1;
+                continue;
+            }
 
             // Horizontal rule
             if (/^---+$/.test(trimmed)) {
@@ -190,8 +256,16 @@
                 document.title = t('site.pageTitle', { page: firstHeading });
             }
 
-            metaEl.innerHTML = t('article.sourceHtml', { href: escapeHtml(requestedSrc) });
-            metaEl.style.display = 'block';
+            // The methodology is one of our own pages: no raw-text link, and back goes to Profils.
+            if (requestedSrc === METHODOLOGY_SRC) {
+                const back = document.querySelector('.article-breadcrumb a');
+                back.href = `personalities.html${METHODOLOGY_HASH}`;
+                back.removeAttribute('data-i18n');
+                back.textContent = t('article.backMethodology');
+            } else {
+                metaEl.innerHTML = t('article.sourceHtml', { href: escapeHtml(requestedSrc) });
+                metaEl.style.display = 'block';
+            }
 
             const markdownForBody = firstHeading ? stripFirstH1(markdown) : markdown;
             bodyEl.innerHTML = markdownToHtml(markdownForBody);
@@ -206,7 +280,10 @@
         }
     }
 
+    // Also used by the methodology section of the Profils page.
+    window.markdownToHtml = markdownToHtml;
+
     document.addEventListener('DOMContentLoaded', () => {
-        initArticlePage();
+        if (document.getElementById('articleBody')) initArticlePage();
     });
 })();

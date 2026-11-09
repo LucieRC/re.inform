@@ -509,7 +509,6 @@ body > footer p { margin: 0; color: var(--muted); }
 .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 
-.filter-hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
 .filter-clear {
     border: 0;
     background: none;
@@ -867,7 +866,8 @@ button.tag:hover { color: var(--text); }
 }
 
 /* Resources: Bibliothèque / Articles switch (same look as the home mode switch). */
-.sub-tabs { margin: 0 0 20px; }
+/* `flex` + fit-content: the tabs keep their own line, so the eyebrow below can't sit beside them. */
+.sub-tabs { display: flex; width: fit-content; margin: 0 0 20px; }
 .sub-tabs a {
     padding: 8px 16px;
     border-radius: 9px;
@@ -882,3 +882,335 @@ button.tag:hover { color: var(--text); }
 /* Profile « Comment aider »: the main column is narrow, so one task per row. */
 #contributeSection .help-paths { grid-template-columns: 1fr; }
 #contributeSection .onb-step { font-size: 17px; margin: 20px 0 10px; }
+
+/* Toast with one or two links (« Se connecter » · « Créer un compte »): they wrap under the text on phones. */
+.toast { flex-wrap: wrap; width: max-content; } /* centred with left:50%, so size it to its text (up to max-width), not to half the screen */
+.toast-actions { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* Answer form tip: who you answer, then the profile's approach on its own line. */
+.composer-hint-tip { display: block; margin-top: 6px; }
+
+/* « Introuvable » (unknown claim, member…): one calm centred message, nothing else. */
+.not-found { text-align: center; padding: 56px 0 32px; }
+.not-found h2 { font-size: 24px; margin: 0 0 8px; }
+.not-found p { color: var(--muted); margin: 0; }
+.not-found a:not(.btn) { color: var(--brand); font-weight: 600; }
+.not-found h1 { font-size: 28px; margin: 0 0 8px; }
+.not-found-action { margin-top: 24px !important; }
+
+/* « Aider » for visitors: what an account adds, then two buttons (instead of the profile link). */
+.help-more-guest { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--muted); max-width: 520px; margin: 24px auto 0; }
+.help-more-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.help-more-guest a.btn-primary { color: #fff; }
+.help-more-guest a.btn-secondary { color: var(--text); }
+
+/* Empty feed for a profile with no answer yet. */
+.feed-empty .feed-empty-hint { font-size: 14px; }
+
+/* Article quotes (markdown "> …"). */
+.article-body blockquote {
+    margin: 20px 0;
+    padding: 12px 18px;
+    border-left: 3px solid var(--brand);
+    background: var(--brand-soft);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text);
+}
+.article-body blockquote p { margin: 0; }
+.article-body blockquote p + p { margin-top: 8px; }
+
+/* Article tables (markdown "| a | b |"); wide ones scroll inside .table-scroll. */
+.article-body .table-scroll { margin: 20px 0; }
+.article-body table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.45; }
+.article-body th, .article-body td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.article-body th { font-weight: 600; border-bottom-color: var(--line-strong); }
+.article-body tr > :last-child { padding-right: 0; }
+
+/* Profile contribution cards: « Idée reçue » / « Réponse » chip above the quote. */
+.contribution-kind { display: inline-flex; align-items: center; gap: .3rem; margin-bottom: .5rem; }
+.contribution-kind .icon { width: 13px; height: 13px; }
+
+/* Home header: key figures above the mode switch, actions on the right. */
+.home-stats { margin: 16px 0 0; min-height: 50px; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-actions .btn-soft[hidden] { display: none; }
+
+/* Small forms unfolded on the home page. */
+.composer input[type="url"], .composer input[type="text"] {
+    width: 100%;
+    margin-top: 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    padding: 10px 14px;
+    font: inherit;
+}
+.composer input[type="url"]:focus, .composer input[type="text"]:focus { outline: none; border-color: var(--brand); background: var(--card); }
+.composer .composer-field-gap { margin-top: 14px; }
+.composer .onb-optional { font-weight: 400; color: var(--muted); }
+
+/* « Comment ces profils ont été construits » */
+.method-link { margin: 16px 0 0; font-size: 14px; }
+.method-link a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.method-link a:hover { color: var(--text); }
+.method-link[hidden] { display: none; }
+
+/* Same text at the end of Profils: a button that opens the methodology inline. */
+.method { margin-top: 24px; scroll-margin-top: 88px; }
+.method-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+.method-toggle:hover { color: var(--text); }
+.method-toggle span { text-decoration: underline; text-underline-offset: 2px; }
+.method-toggle svg { flex: none; width: 16px; height: 16px; transition: transform .15s ease; }
+.method-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.method-panel {
+    margin-top: 8px;
+    padding: 32px;
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.method-panel[hidden], .method-status[hidden] { display: none; }
+.method-status { color: var(--muted); font-size: 15px; }
+.method-error { color: var(--error-color); }
+.method-panel .article-body { max-width: none; }
+.method-panel .article-body > :first-child { margin-top: 0; }
+.method-panel .article-body > :last-child { margin-bottom: 0; }
+@media (max-width: 640px) {
+    .method-panel { padding: 20px; }
+}
+
+/* Filter menu with its own search (Bibliothèque > Thème). */
+.filterbar-menu.has-search { display: flex; flex-direction: column; overflow: hidden; max-height: 380px; }
+.filterbar-menu.has-search[hidden] { display: none; }
+.filterbar-menu.has-search .filterbar-options { overflow-y: auto; min-height: 0; }
+.filterbar-menu-head { padding: 4px 4px 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.filterbar-menu-search {
+    width: 100%;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 14px;
+}
+.filterbar-menu-search:focus { outline: none; border-color: var(--brand); background: var(--card); }
+.filterbar-menu-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.filterbar-menu-actions button {
+    border: 0;
+    background: none;
+    padding: 4px 2px;
+    color: var(--brand);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.filterbar-menu-actions button:hover { text-decoration: underline; }
+
+/* Answer dialog: wide and centred; full screen on phones. */
+.composer-panel {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+    width: min(760px, calc(100vw - 48px));
+    height: auto;
+    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+.composer-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 18px 24px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+}
+.composer-body { padding: 20px 24px 24px; }
+.composer-panel .form-actions { display: flex; align-items: center; justify-content: flex-end; flex-direction: row; gap: 8px; }
+.composer-panel .form-actions .btn { width: auto; }
+.composer-draft-status { margin-right: auto; color: var(--muted); font-size: 13px; }
+.composer-draft-status.is-error { color: var(--error-color, #b3261e); }
+html.composer-open { overflow: hidden; }
+@media (max-width: 560px) {
+    .composer-panel {
+        top: 0;
+        left: 0;
+        bottom: auto;
+        transform: none;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        max-height: none;
+        border: 0;
+        border-radius: 0;
+    }
+    .composer-header { padding: 14px 16px; }
+    .composer-body { padding: 16px; }
+}
+
+/* Toast button (« Annuler »), same look as its links. */
+button.toast-action { border: 0; background: none; padding: 0; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+/* Profile: drafts */
+.drafts-list { display: flex; flex-direction: column; gap: 8px; }
+.draft-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.draft-main { flex: 1; min-width: 0; }
+.draft-claim { margin: 0; font-weight: 600; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.draft-meta { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.draft-row .btn { flex: none; }
+.draft-delete {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+.draft-delete:hover { background: var(--tint); color: var(--text); }
+.draft-delete svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+@media (max-width: 600px) {
+    .draft-row { flex-wrap: wrap; }
+    .draft-main { flex: 1 1 100%; }
+    .draft-row .btn { margin-right: auto; }
+}
+
+/* Profile picture: pencil in the middle, always visible (touch screens have no hover). */
+.profile-avatar-wrap { position: relative; width: 96px; height: 96px; }
+.avatar-edit {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+}
+.avatar-edit[hidden] { display: none; }
+.avatar-edit:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.avatar-edit:disabled { cursor: progress; opacity: 0.6; }
+.avatar-edit-badge {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    transition: background-color 0.15s ease;
+}
+.avatar-edit:hover .avatar-edit-badge { background: rgba(0, 0, 0, 0.75); }
+.avatar-edit-badge svg { width: 18px; height: 18px; display: block; }
+
+/* Profile: followed topics, same pills and card as the rest of the page. */
+.followed-tags-list {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+}
+.followed-tags-toolbar { justify-content: flex-start; margin-bottom: 12px; }
+.followed-tags-content { gap: 6px; }
+.followed-tag {
+    gap: 2px;
+    padding: 4px 4px 4px 12px;
+    background: var(--tint);
+    border: 0;
+    border-radius: 999px;
+    transition: none;
+}
+.followed-tag:hover { border-color: transparent; transform: none; }
+.followed-tag-link { font-size: 14px; font-weight: 500; color: var(--text); text-decoration: none; }
+.followed-tag-link:hover { color: var(--brand); text-decoration: none; }
+.tag-remove {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+}
+.tag-remove:hover { background: var(--line); color: var(--text); }
+#tagsFollowingSection .followed-tags-content .empty-message {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+.profile-avatar .error-message { margin-top: 0.35rem; font-size: 0.85rem; }
+
+/* A neutral note in a form (e.g. « Il vous faut un compte »); styles.css only shows success/error ones. */
+.form-message:not(.success):not(.error):not(:empty) {
+    display: block;
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    background: var(--tint);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+}
+
+/* Own profile: the pencil replaces the initial, so the two never overlap. */
+.profile-avatar-wrap:has(.avatar-edit:not([hidden])) .avatar-initials { visibility: hidden; }
+#draftsSection { margin-bottom: 24px; }
+
+/* Phone: filter menus span the bar instead of starting under their button (they ran off-screen). */
+@media (max-width: 600px) {
+    .filterbar-facets { position: relative; }
+    .filterbar-facet { position: static; }
+    .filterbar-menu { left: 0; right: 0; width: auto; }
+}
+
+/* Phone: both « Ajouter… » buttons share one row (no icon, so the labels fit). */
+@media (max-width: 600px) {
+    .home-actions { width: 100%; flex-wrap: nowrap; }
+    .home-actions .btn-soft { flex: 1 1 0; justify-content: center; padding: 10px 6px; font-size: 14px; white-space: nowrap; }
+    .home-actions .btn-soft svg { display: none; }
+}
+
+/* Profile, one column: drafts come right after the name and stats, as on desktop.
+   The two columns dissolve so their sections can be ordered together. */
+@media (max-width: 900px) {
+    .profile-layout { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
+    .profile-sidebar, .profile-main { display: contents; }
+    .profile-sidebar > :not(.profile-rail-section) { order: -2; }
+    #draftsSection { order: -1; margin-top: var(--spacing-md); }
+}
+
+/* A link inside an error box stays readable in both themes (the box is pale pink in each). */
+.form-message.error a { color: inherit; text-decoration: underline; font-weight: 600; }
