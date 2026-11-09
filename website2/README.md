@@ -64,6 +64,10 @@ The frontend is served by the Flask backend. Once the backend is running, open y
 - Explore: `http://localhost:5000/explore.html`
 - Admin: `http://localhost:5000/admin.html`
 
+## Data
+
+Content data (`backend/data/`, gallery images) is not in this repository: part of it is third-party content. The site needs a local copy of it to run.
+
 ## Configuration
 
 ### Admin Password

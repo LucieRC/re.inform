@@ -17,3 +17,15 @@ EVS/README_files/
 
 # Backups written by data migration scripts
 *.bak-*
+
+# Data stays out of the public repository (third-party content, survey outputs)
+website2/backend/data/*
+!website2/backend/data/articles/
+website2/backend/data/articles/*
+!website2/backend/data/articles/methodologie_profils.md
+website2/frontend/assets/gallery/
+Observatoire_Medias_Ecologie/output/
+EVS/output/
+EVS/documentation_scrapping/*.csv
+EVS/documentation_scrapping/*.html
+archive/website2-legacy-data/*.json
