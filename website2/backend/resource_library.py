@@ -294,7 +294,25 @@ def _clean(value: Any) -> Optional[str]:
     if not isinstance(value, str):
         return None
     stripped = value.strip()
+    if is_placeholder_text(stripped):
+        return None
     return stripped or None
+
+
+def is_placeholder_text(value: Any) -> bool:
+    """True for empty text or a stand-in like "..." / "…" left in a draft entry."""
+    if not isinstance(value, str):
+        return True
+    return not value.strip().strip(".…").strip()
+
+
+def is_placeholder_curated(item: Dict[str, Any]) -> bool:
+    """A curated entry still waiting for content: no summary and no narrative.
+
+    Such drafts stay in resources.json but are hidden from every listing until
+    someone fills them in.
+    """
+    return is_placeholder_text(item.get("summary")) and is_placeholder_text(item.get("narrative"))
 
 
 def _tags(raw: Any) -> List[str]:
@@ -391,7 +409,7 @@ def build_library(
 
     # 1. Curated list — hand-picked, so it wins on metadata and is pre-vetted.
     for item in (curated or []):
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or is_placeholder_curated(item):
             continue
         entry = touch(item.get("source"), "curated", vetted=True)
         if entry is None:

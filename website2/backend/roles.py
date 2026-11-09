@@ -230,8 +230,8 @@ def _sourcer_done(store: Dict[str, Any], user_id: int, weights: Dict[int, int]) 
 def _wordsmith_done(store: Dict[str, Any], user_id: int) -> int:
     """How many of this user's debunks are well rated by other members."""
     scores: Dict[int, List[int]] = {}
-    for r in store.get('ratings', []) or []:
-        if isinstance(r, dict) and isinstance(r.get('score'), int) and r.get('user_id') != user_id:
+    for r in argstore.counted_ratings(store):
+        if r.get('user_id') != user_id:
             scores.setdefault(r.get('counter_argument_id'), []).append(r['score'])
 
     done = 0

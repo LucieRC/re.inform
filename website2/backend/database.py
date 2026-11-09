@@ -3,7 +3,7 @@ Database module for re.inform user authentication and reputation system
 """
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'data', 'users.db')
@@ -175,6 +175,27 @@ def init_db():
     ''')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pending_votes_anon ON pending_votes(anon_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pending_votes_ip ON pending_votes(ip_address, created_at)')
+
+    # Unfinished answers, private to their author. A NULL persona means
+    # « Tout le monde »; SQLite treats NULLs as all different in a UNIQUE
+    # constraint, so the one-draft-per-key rule is an index on COALESCE.
+    # `sources` is a JSON list of what was typed, deliberately not validated.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS answer_drafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            argument_id INTEGER NOT NULL,
+            persona_archetype_id INTEGER,
+            text TEXT NOT NULL DEFAULT '',
+            sources TEXT NOT NULL DEFAULT '[]',
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_answer_drafts_key
+        ON answer_drafts(user_id, argument_id, COALESCE(persona_archetype_id, -1))
+    ''')
 
     conn.commit()
     conn.close()
@@ -816,3 +837,80 @@ def delete_pending_votes(anon_id):
     cursor.execute('DELETE FROM pending_votes WHERE anon_id = ?', (anon_id,))
     conn.commit()
     conn.close()
+
+
+# ========================================
+# Answer drafts
+# ========================================
+
+def get_answer_drafts(user_id):
+    """A user's drafts, newest first."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM answer_drafts WHERE user_id = ? ORDER BY updated_at DESC, id DESC',
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def save_answer_draft(user_id, argument_id, persona_id, text, sources_json, max_drafts):
+    """Create or update the draft for this user x claim x profile.
+
+    Returns the saved row, or None when it would be a new draft past max_drafts
+    (updating an existing draft is always allowed). The write lock is taken
+    first so that autosaves arriving together can't slip past the limit.
+    """
+    now = datetime.now(timezone.utc).isoformat(timespec='microseconds')
+    conn = get_db()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        exists = conn.execute(
+            'SELECT 1 FROM answer_drafts WHERE user_id = ? AND argument_id = ? AND persona_archetype_id IS ?',
+            (user_id, argument_id, persona_id),
+        ).fetchone()
+        if not exists:
+            count = conn.execute('SELECT COUNT(*) FROM answer_drafts WHERE user_id = ?', (user_id,)).fetchone()[0]
+            if count >= max_drafts:
+                conn.rollback()
+                return None
+        conn.execute('''
+            INSERT INTO answer_drafts (user_id, argument_id, persona_archetype_id, text, sources, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, argument_id, COALESCE(persona_archetype_id, -1))
+            DO UPDATE SET text = excluded.text, sources = excluded.sources, updated_at = excluded.updated_at
+        ''', (user_id, argument_id, persona_id, text, sources_json, now))
+        row = conn.execute(
+            'SELECT * FROM answer_drafts WHERE user_id = ? AND argument_id = ? AND persona_archetype_id IS ?',
+            (user_id, argument_id, persona_id),
+        ).fetchone()
+        conn.commit()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+def clear_answer_draft(user_id, argument_id, persona_id):
+    """Delete the draft for this user x claim x profile, if there is one."""
+    conn = get_db()
+    try:
+        conn.execute(
+            'DELETE FROM answer_drafts WHERE user_id = ? AND argument_id = ? AND persona_archetype_id IS ?',
+            (user_id, argument_id, persona_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_answer_draft(user_id, draft_id):
+    """Delete one of this user's own drafts. False if they have no such draft."""
+    conn = get_db()
+    try:
+        cursor = conn.execute('DELETE FROM answer_drafts WHERE id = ? AND user_id = ?', (draft_id, user_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()

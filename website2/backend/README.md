@@ -106,6 +106,8 @@ Success messages that used to be English-only also carry a `code`.
   `answer_text_required`, `invalid_argument_id`, `invalid_counter_argument_id`,
   `persona_required`, `persona_not_found`, `persona_not_named`, `invalid_persona_id`,
   `tags_not_list`, `endpoint_moved`
+- Answer drafts: `draft_not_found`, `draft_text_too_long` (with `max_length`), `drafts_limit`
+  (with `limit`), `invalid_sources`, `draft_sources_too_long`
 - Votes: `invalid_score`, `anon_vote_limit`, `anon_votes_ip_limit` (both with `needs_account: true`)
 - Sources / resources: `invalid_url`, `url_required`, `topics_not_list`, `invalid_status`,
   `invalid_type`, `invalid_verdict`, and the source-check refusals `check_login_required`,
@@ -120,7 +122,7 @@ Success messages that used to be English-only also carry a `code`.
   `payload_too_large`, `bad_request`, `server_error` (any uncoded JSON error gets `http_<status>`)
 - Success codes: `registered`, `logged_in`, `logged_out`, `tag_followed`, `tag_unfollowed`,
   `user_followed`, `user_unfollowed`, `user_endorsed`, `nomination_submitted`,
-  `nomination_approved`, `nomination_rejected`
+  `nomination_approved`, `nomination_rejected`, `draft_saved`, `draft_deleted`
 
 Label ids already in payloads: roles `role` (`wordsmith|sourcer|field_agent`) and
 `progress.unit_code` (`checks_matching_verdict|debunks_well_rated`); activity feed

@@ -270,6 +270,13 @@ def cmd_export(args):
                 conn.execute(f'DELETE FROM {table} WHERE {where}', ids * len(cols))
         conn.execute(f'DELETE FROM users WHERE id IN ({marks})', ids)
         counts['accounts'] = len(test_ids)
+
+    # Unfinished answers are private to whoever wrote them, test account or not.
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='answer_drafts'").fetchone():
+        drafts = conn.execute('SELECT COUNT(*) FROM answer_drafts').fetchone()[0]
+        conn.execute('DELETE FROM answer_drafts')
+        if drafts:
+            counts['answer drafts'] = drafts
     conn.commit()
     conn.execute('VACUUM')  # so deleted rows can't be read back from free pages
     conn.close()

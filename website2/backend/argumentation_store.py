@@ -503,16 +503,88 @@ def create_rating(
     if not isinstance(score, int) or score < 1 or score > 5:
         raise ValueError("Score must be an integer between 1 and 5")
 
+    """Record how well an answer works for a profile (1..5).
+
+    One standing rating per person x answer x profile: rating again replaces
+    the score (and moves `updated_at`) instead of adding a second rating.
+    """
+    persona_archetype_id = int(persona_archetype_id) if persona_archetype_id is not None else None
+
+    if user_id is not None:
+        existing = find_user_rating(
+            store, counter_argument_id=counter_argument_id,
+            persona_archetype_id=persona_archetype_id, user_id=user_id,
+        )
+        if existing is not None:
+            existing["score"] = int(score)
+            existing["updated_at"] = _now_iso()
+            return existing
+
     rating = {
         "id": _next_int_id(store["ratings"]),
         "counter_argument_id": int(counter_argument_id),
-        "persona_archetype_id": int(persona_archetype_id) if persona_archetype_id is not None else None,
+        "persona_archetype_id": persona_archetype_id,
         "score": int(score),
         "user_id": int(user_id) if user_id is not None else None,
         "created_at": _now_iso(),
     }
     store["ratings"].append(rating)
     return rating
+
+
+def _rating_key(r: Dict[str, Any]) -> Tuple[Any, Any, Any]:
+    return (r.get("user_id"), r.get("counter_argument_id"), r.get("persona_archetype_id"))
+
+
+def find_user_rating(
+    store: Dict[str, Any],
+    *,
+    counter_argument_id: int,
+    persona_archetype_id: Optional[int],
+    user_id: int,
+) -> Optional[Dict[str, Any]]:
+    """This user's latest rating of an answer for a profile, if any."""
+    found = None
+    key = (int(user_id), int(counter_argument_id), persona_archetype_id)
+    for r in store.get("ratings", []) or []:
+        if isinstance(r, dict) and _rating_key(r) == key:
+            found = r  # later entries win (older data may hold duplicates)
+    return found
+
+
+def counted_ratings(store: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The ratings that count: valid entries, one per person x answer x profile.
+
+    Older data can hold several ratings from the same account for the same
+    answer and profile (before re-rating replaced the score). Only the latest
+    of those counts. Ratings with no user (legacy imports) all count.
+    """
+    latest: Dict[Tuple[Any, Any, Any], Dict[str, Any]] = {}
+    anonymous: List[Dict[str, Any]] = []
+    for r in store.get("ratings", []) or []:
+        if not isinstance(r, dict):
+            continue
+        if not isinstance(r.get("counter_argument_id"), int) or not isinstance(r.get("score"), int):
+            continue
+        if r.get("user_id") is None:
+            anonymous.append(r)
+        else:
+            latest[_rating_key(r)] = r
+    return anonymous + list(latest.values())
+
+
+def duplicate_rating_count(store: Dict[str, Any]) -> int:
+    """How many stored ratings are superseded duplicates (same person x answer x profile)."""
+    total = sum(
+        1 for r in store.get("ratings", []) or []
+        if isinstance(r, dict) and r.get("user_id") is not None
+        and isinstance(r.get("counter_argument_id"), int) and isinstance(r.get("score"), int)
+    )
+    return total - len({
+        _rating_key(r) for r in store.get("ratings", []) or []
+        if isinstance(r, dict) and r.get("user_id") is not None
+        and isinstance(r.get("counter_argument_id"), int) and isinstance(r.get("score"), int)
+    })
 
 
 def set_importance_rating(
@@ -524,9 +596,8 @@ def set_importance_rating(
 ) -> Dict[str, Any]:
     """Record how urgent a claim is to debunk (1..5).
 
-    Unlike effectiveness ratings — which accumulate, one per person per debunk —
-    importance is a standing opinion on a claim, so a second vote from the same
-    person replaces the first instead of stacking.
+    Importance is a standing opinion on a claim, so a second vote from the same
+    person replaces the first instead of stacking (like effectiveness ratings).
     """
     if not isinstance(score, int) or score < 1 or score > 5:
         raise ValueError("Score must be an integer between 1 and 5")
@@ -634,9 +705,9 @@ def build_indexes(store: Dict[str, Any]) -> Tuple[Dict[int, Dict[str, Any]], Dic
 
 def avg_rating_for_counter_argument(store: Dict[str, Any], counter_argument_id: int) -> Optional[float]:
     scores = [
-        int(r.get("score"))
-        for r in store.get("ratings", [])
-        if isinstance(r, dict) and r.get("counter_argument_id") == counter_argument_id and isinstance(r.get("score"), int)
+        int(r["score"])
+        for r in counted_ratings(store)
+        if r.get("counter_argument_id") == counter_argument_id
     ]
     if not scores:
         return None

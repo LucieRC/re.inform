@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import time
+import unicodedata
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
@@ -221,18 +222,32 @@ def _unauthorized():
 
 
 _HTTP_CODES = {400: 'bad_request', 401: 'auth_required', 403: 'forbidden', 404: 'not_found',
-               405: 'method_not_allowed', 413: 'payload_too_large', 429: 'rate_limited',
+               405: 'method_not_allowed', 413: 'payload_too_large', 415: 'unsupported_media_type',
+               429: 'rate_limited',
                500: 'server_error'}
+
+
+def _avatar_too_large():
+    return api_error('image_too_large', 'Image is too large (max 3 MB)', 413)
 
 
 @app.errorhandler(400)
 @app.errorhandler(404)
 @app.errorhandler(405)
 @app.errorhandler(413)
+@app.errorhandler(415)
 @app.errorhandler(500)
 def _http_error(exc):
     status = getattr(exc, 'code', 500) or 500
+    if status == 413 and request.endpoint == 'upload_avatar':
+        # Past MAX_CONTENT_LENGTH the avatar view never gets to measure the file.
+        return _avatar_too_large()
     if not request.path.startswith('/api/'):
+        if status == 404 and os.path.isfile(os.path.join(app.static_folder, '404.html')):
+            # Unknown pages get the site's own French 404 page (API 404s stay JSON).
+            response = send_from_directory(app.static_folder, '404.html')
+            response.status_code = 404
+            return response
         return exc if status != 500 else ('Internal Server Error', 500)
     return api_error(_HTTP_CODES.get(status, f'http_{status}'),
                      getattr(exc, 'description', None) or 'Request failed', status)
@@ -339,11 +354,25 @@ def serve_static(path):
 # Authentication Endpoints
 # ========================================
 
+USERNAME_MIN, USERNAME_MAX = 3, 30
+_USERNAME_EXTRA_CHARS = set('._-')
+
+
+def _username_chars_ok(username):
+    """Letters (accents welcome), digits, and . _ - only; no spaces or markup."""
+    return all(
+        ch in _USERNAME_EXTRA_CHARS
+        or unicodedata.category(ch)[0] == 'L'
+        or unicodedata.category(ch) == 'Nd'
+        for ch in username
+    )
+
+
 @app.route('/api/register', methods=['POST'])
 def register():
     """Register a new user."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         username = data.get('username', '').strip()
         email = data.get('email', '').strip()
         password = data.get('password', '')
@@ -352,8 +381,15 @@ def register():
         if not username or not email or not password:
             return api_error('fields_required', 'All fields are required', 400)
         
-        if len(username) < 3:
-            return api_error('username_too_short', 'Username must be at least 3 characters', 400)
+        username = unicodedata.normalize('NFC', username)
+        if len(username) < USERNAME_MIN:
+            return api_error('username_too_short', 'Le nom d’utilisateur doit faire au moins 3 caractères.', 400)
+        if len(username) > USERNAME_MAX:
+            return api_error('username_too_long', 'Le nom d’utilisateur doit faire au plus 30 caractères.', 400)
+        if not _username_chars_ok(username):
+            return api_error('username_invalid_chars',
+                             'Le nom d’utilisateur ne peut contenir que des lettres, des chiffres, '
+                             'des points, des tirets et des tirets bas.', 400)
         
         if len(password) < 6:
             return api_error('password_too_short', 'Password must be at least 6 characters', 400)
@@ -393,7 +429,7 @@ def register():
 def login():
     """Login a user."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         username = data.get('username', '').strip()
         password = data.get('password', '')
         remember = data.get('remember', False)
@@ -401,8 +437,9 @@ def login():
         if not username or not password:
             return api_error('credentials_required', 'Username and password required', 400)
         
-        # Get user
-        user_dict = db.get_user_by_username(username)
+        # Get user (sign-up stores names NFC-normalised; older names may not be).
+        user_dict = (db.get_user_by_username(username)
+                     or db.get_user_by_username(unicodedata.normalize('NFC', username)))
         if not user_dict:
             return api_error('invalid_credentials', 'Invalid username or password', 401)
         
@@ -517,7 +554,7 @@ def upload_avatar():
 
     file.seek(0, os.SEEK_END)
     if file.tell() > AVATAR_MAX_BYTES:
-        return api_error('image_too_large', 'Image is too large (max 3 MB)', 413)
+        return _avatar_too_large()
     file.seek(0)
 
     # Deterministic name: a re-upload replaces the previous picture.
@@ -554,6 +591,29 @@ def delete_avatar():
 
     return jsonify({'success': True})
 
+def _claim_contribution_view(arg):
+    """One claim the user added, for profile contribution lists.
+
+    Shaped close to legacy_contribution_view (narrative/title/tags/date) so the
+    existing contribution cards render it, plus `kind: 'claim'`, `text` and `href`.
+    """
+    text = str(arg.get('text') or '').strip()
+    title = text if len(text) <= 80 else text[:79].rstrip() + '…'
+    return {
+        'kind': 'claim',
+        'id': arg.get('id'),
+        'argument_id': arg.get('id'),
+        'href': f"argument.html?id={arg.get('id')}",
+        'title': title,
+        'text': text,
+        'narrative': text,
+        'tags': list(arg.get('tags') or []),
+        'date': arg.get('created_at'),
+        'status': argstore.status_of(arg),
+        'user_id': arg.get('created_by_user_id'),
+    }
+
+
 @app.route('/api/user/<int:user_id>', methods=['GET'])
 def get_user_profile(user_id):
     """Get user profile."""
@@ -579,6 +639,19 @@ def get_user_profile(user_id):
             continue
         view = argstore.legacy_contribution_view(store, ca, args_by_id=args_by_id, personas_by_id=personas_by_id)
         if view:
+            view['kind'] = 'response'
+            view['username'] = user_dict['username']
+            user_contributions.append(view)
+    # Claims the user added: published ones are public; pending ones only
+    # count towards submission_count (like answers in review).
+    own_claims = [
+        a for a in (store.get('arguments') or [])
+        if isinstance(a, dict) and a.get('created_by_user_id') == user_id
+        and argstore.status_of(a) != argstore.STATUS_REJECTED
+    ]
+    for arg in own_claims:
+        if argstore.is_published(arg):
+            view = _claim_contribution_view(arg)
             view['username'] = user_dict['username']
             user_contributions.append(view)
     user_contributions.sort(key=lambda c: str(c.get('date') or ''), reverse=True)
@@ -608,7 +681,7 @@ def get_user_profile(user_id):
         # Public roles only: Field Agent stays private (see roles.ROLE_CATALOG).
         'roles': roleslib.describe_roles(store, user_id, public_only=True),
         'contribution_count': len(user_contributions),
-        'submission_count': len(own_answers),
+        'submission_count': len(own_answers) + len(own_claims),
         'following_count': following_count,
         'followers_count': followers_count,
         'is_following': is_following,
@@ -622,8 +695,9 @@ def my_contributions():
     """The signed-in user's own submissions with their review status.
 
     Powers the profile 'status tracker': the user's answers in the argumentation
-    store (published answers show as 'approved', plus any pending/rejected) and
-    resources they submitted to the library (with the library's review status).
+    store (published answers show as 'approved', plus any pending/rejected), the
+    claims they added (`kind: 'claim'`, same statuses) and resources they
+    submitted to the library (with the library's review status).
     Own-profile only — never exposed for another user, since pending/rejected
     work is private.
     """
@@ -654,6 +728,24 @@ def my_contributions():
             'counter_argument_id': ca.get('id'),
             'href': (f"argument.html?id={ca.get('argument_id')}"
                      if status == argstore.STATUS_PUBLISHED and argstore.is_published(arg) else None),
+        })
+
+    # Claims the user added (own-profile, so pending/rejected show too).
+    for arg in store.get('arguments') or []:
+        if not isinstance(arg, dict) or arg.get('created_by_user_id') != uid:
+            continue
+        status = argstore.status_of(arg)
+        text = str(arg.get('text') or '').strip()
+        items.append({
+            'kind': 'claim',
+            'title': text[:140] or 'Untitled claim',
+            'text': text,
+            'status': tracker_status[status],
+            'submitted_at': arg.get('created_at'),
+            'date': arg.get('created_at'),
+            'argument_id': arg.get('id'),
+            'href': (f"argument.html?id={arg.get('id')}"
+                     if status == argstore.STATUS_PUBLISHED else None),
         })
 
     # Resources the user submitted to the library, with their review status.
@@ -916,6 +1008,8 @@ def get_resources():
     for r in (resources or []):
         if not isinstance(r, dict):
             continue
+        if library.is_placeholder_curated(r):
+            continue  # draft entry with no content yet (e.g. "..." summary): hidden until filled
 
         author_user_id = None
         author_field = r.get('author')
@@ -1338,12 +1432,8 @@ def list_arguments_v1():
 
     # Average rating per counter-argument (for the "top response" preview).
     scores_by_counter = {}
-    for r in store.get('ratings', []) or []:
-        if not isinstance(r, dict):
-            continue
-        cid = r.get('counter_argument_id')
-        if isinstance(cid, int) and isinstance(r.get('score'), int):
-            scores_by_counter.setdefault(cid, []).append(int(r['score']))
+    for r in argstore.counted_ratings(store):
+        scores_by_counter.setdefault(r['counter_argument_id'], []).append(int(r['score']))
 
     def _avg(cid):
         s = scores_by_counter.get(cid)
@@ -1490,22 +1580,39 @@ def get_argument_v1(argument_id: int):
             out.append({'id': None, 'url': ca.get('source_url'), 'title': None})
         return out
 
-    # Pre-group ratings by counter_argument_id
+    viewer_id = current_user.id if current_user.is_authenticated else None
+    viewer_role = current_user.role if current_user.is_authenticated else None
+
+    # Pre-group ratings by counter_argument_id (one per person x answer x profile),
+    # and collect the viewer's own ratings so the page can show them.
     rating_by_counter = {}
-    for r in store.get('ratings', []) or []:
-        if not isinstance(r, dict):
-            continue
-        cid = r.get('counter_argument_id')
-        if not isinstance(cid, int) or not isinstance(r.get('score'), int):
-            continue
+    my_ratings_by_counter = {}
+    for r in argstore.counted_ratings(store):
+        cid = r['counter_argument_id']
         rating_by_counter.setdefault(cid, []).append(int(r['score']))
+        if viewer_id is not None and r.get('user_id') == viewer_id:
+            my_ratings_by_counter.setdefault(cid, []).append(
+                {'persona_archetype_id': r.get('persona_archetype_id'), 'score': int(r['score']),
+                 'pending': False})
+    if viewer_id is None:
+        # A visitor's votes wait in pending until they sign up; still show them back.
+        for v in db.get_pending_votes(_anon_id()):
+            if v['kind'] == 'effectiveness':
+                my_ratings_by_counter.setdefault(v['target_id'], []).append(
+                    {'persona_archetype_id': v['persona_id'], 'score': int(v['score']), 'pending': True})
+
+    def _my_score(ca, mine):
+        """The viewer's score for the answer's own profile, else for 'everyone'."""
+        by_persona = {m['persona_archetype_id']: m['score'] for m in mine}
+        own = ca.get('persona_archetype_id')
+        if own in by_persona:
+            return by_persona[own]
+        return by_persona.get(None)
 
     # Source-verified stamp, plus whether the viewer can add a check.
     checks_by_counter = argstore.source_checks_by_counter(store)
     check_weights = roleslib.check_weights()
     sourcer_ids = set(db.get_role_tiers('sourcer'))
-    viewer_id = current_user.id if current_user.is_authenticated else None
-    viewer_role = current_user.role if current_user.is_authenticated else None
 
     def _source_check_for(ca):
         if not roleslib.has_sources(ca):
@@ -1533,6 +1640,7 @@ def get_argument_v1(argument_id: int):
 
         scores = rating_by_counter.get(ca.get('id'), [])
         avg_score = (sum(scores) / len(scores)) if scores else None
+        mine = my_ratings_by_counter.get(ca.get('id'), [])
 
         counter_arguments.append({
             'id': ca.get('id'),
@@ -1542,6 +1650,8 @@ def get_argument_v1(argument_id: int):
             'persona_archetype': persona,
             'rating_count': len(scores),
             'avg_score': avg_score,
+            'my_score': _my_score(ca, mine),
+            'my_ratings': mine,
             'source_check': _source_check_for(ca),
         })
 
@@ -1667,12 +1777,162 @@ def create_counter_argument_v1():
             created_by_user_id=current_user.id,
         )
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
+        _clear_published_draft(current_user.id, argument_id, persona_id, text)
         return jsonify({'success': True, 'counter_argument': counter}), 201
     except ValueError as e:
         return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
         print(f"Error creating counter-argument: {e}")
         return api_error('server_error', 'Failed to create counter-argument', 500)
+
+
+# ========================================
+# Answer drafts
+# ========================================
+# An answer left unpublished stays on the author's profile. Only ever visible
+# to its author, and never published (bin/test_data.py export drops the table).
+# Saved repeatedly while typing, so it doesn't use the daily posting limits.
+# Sources are kept as typed: the frontend must pass them through safeHref.
+
+# Answers themselves have no length limit; this only keeps a draft a sane size.
+DRAFT_TEXT_MAX = 20000
+DRAFTS_PER_USER = 50
+DRAFT_SOURCES_MAX = 50
+DRAFT_SOURCE_LENGTH_MAX = 2048
+DRAFT_EVERYONE_NAME = 'Tout le monde'
+
+
+def _is_row_id(value):
+    # bool is an int in Python; past 2^63 SQLite raises instead of not matching.
+    return isinstance(value, int) and not isinstance(value, bool) and 0 < value < 2 ** 63
+
+
+def _draft_json(draft, claim_text, persona):
+    pid = draft['persona_archetype_id']
+    try:
+        sources = json.loads(draft['sources'])
+    except ValueError:
+        sources = []
+    return {
+        'id': draft['id'],
+        'argument_id': draft['argument_id'],
+        'persona_archetype_id': pid,
+        'text': draft['text'],
+        'sources': sources,
+        'updated_at': draft['updated_at'],
+        'claim_text': claim_text,
+        'persona_name': DRAFT_EVERYONE_NAME if pid is None else (persona or {}).get('name'),
+        # A profile retired since the draft was saved opens the composer unset.
+        'href': f"argument.html?id={draft['argument_id']}&write={pid if persona else 'any'}",
+    }
+
+
+def _clear_published_draft(user_id, argument_id, persona_id, text):
+    """Remove the draft an answer just came from. Never fails the publish.
+
+    Publishing needs a persona, so a draft started under « Tout le monde » can't
+    match on persona alone: it goes too when it holds the text just published.
+    """
+    try:
+        published = argstore.normalize_text(text)
+        for d in db.get_answer_drafts(user_id):
+            if d['argument_id'] != argument_id:
+                continue
+            same_persona = d['persona_archetype_id'] == persona_id
+            same_general = d['persona_archetype_id'] is None and argstore.normalize_text(d['text']) == published
+            if same_persona or same_general:
+                db.delete_answer_draft(user_id, d['id'])
+    except Exception as e:
+        print(f"Error clearing draft after publishing: {e}")
+
+
+@app.route('/api/me/drafts', methods=['GET'])
+@login_required
+def list_my_drafts():
+    uid = current_user.id
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    args_by_id, personas_by_id = argstore.build_indexes(store)
+
+    out = []
+    for d in db.get_answer_drafts(uid):
+        arg = args_by_id.get(d['argument_id'])
+        if arg is None:
+            # An empty store means a missing file, not that every claim is gone.
+            if args_by_id:
+                db.delete_answer_draft(uid, d['id'])
+            continue
+        # Set aside by moderation: its page is hidden, but it can come back.
+        if not argstore.is_published(arg):
+            continue
+        out.append(_draft_json(d, arg.get('text'), personas_by_id.get(d['persona_archetype_id'])))
+    return jsonify({'drafts': out})
+
+
+@app.route('/api/me/drafts', methods=['PUT'])
+@login_required
+def save_my_draft():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    argument_id = data.get('argument_id')
+    persona_id = data.get('persona_archetype_id')
+    text = data.get('text') if data.get('text') is not None else ''
+    raw_sources = data.get('sources') if data.get('sources') is not None else []
+
+    if not _is_row_id(argument_id):
+        return api_error('invalid_argument_id', 'argument_id must be an integer', 400)
+    if persona_id is not None and not _is_row_id(persona_id):
+        return api_error('invalid_persona_id', 'persona_archetype_id must be an integer or null', 400)
+    if not isinstance(text, str):
+        return api_error('invalid_input', 'text must be a string', 400)
+    if not isinstance(raw_sources, list):
+        return api_error('invalid_sources', 'sources must be a list', 400)
+
+    sources = []
+    for s in raw_sources:
+        url = s.get('url') if isinstance(s, dict) else s
+        if isinstance(url, str) and url.strip():
+            sources.append(url.strip())
+
+    # Emptied composer: no draft left. Checked before the claim lookup so a
+    # draft can still be cleared after its claim has gone.
+    if not text.strip() and not sources:
+        db.clear_answer_draft(current_user.id, argument_id, persona_id)
+        return jsonify({'success': True, 'code': 'draft_deleted', 'draft': None})
+
+    if len(text) > DRAFT_TEXT_MAX:
+        return api_error('draft_text_too_long', f'A draft can be at most {DRAFT_TEXT_MAX} characters', 400,
+                         max_length=DRAFT_TEXT_MAX)
+    if len(sources) > DRAFT_SOURCES_MAX or any(len(u) > DRAFT_SOURCE_LENGTH_MAX for u in sources):
+        return api_error('draft_sources_too_long', 'Too many sources, or one is too long', 400)
+
+    store = argstore.load_store(ARGUMENTATION_FILE, PERSONA_ARCHETYPES_FILE)
+    args_by_id, personas_by_id = argstore.build_indexes(store)
+    arg = args_by_id.get(argument_id)
+    if not argstore.is_published(arg):
+        return api_error('claim_not_found', 'Argument not found', 404)
+    persona = personas_by_id.get(persona_id) if persona_id is not None else None
+    if persona_id is not None:
+        if persona is None:
+            return api_error('persona_not_found', 'Persona archetype not found', 404)
+        if persona.get('layer') == 'evs_cluster':
+            return api_error('persona_not_named', 'Choose a named persona', 400)
+
+    saved = db.save_answer_draft(current_user.id, argument_id, persona_id, text,
+                                 json.dumps(sources, ensure_ascii=False), DRAFTS_PER_USER)
+    if saved is None:
+        return api_error('drafts_limit', f'At most {DRAFTS_PER_USER} drafts: delete one to save a new one', 400,
+                         limit=DRAFTS_PER_USER)
+    return jsonify({'success': True, 'code': 'draft_saved', 'draft': _draft_json(saved, arg.get('text'), persona)})
+
+
+@app.route('/api/me/drafts/<int:draft_id>', methods=['DELETE'])
+@login_required
+def delete_my_draft(draft_id):
+    # Someone else's draft is reported exactly like one that doesn't exist.
+    if not _is_row_id(draft_id) or not db.delete_answer_draft(current_user.id, draft_id):
+        return api_error('draft_not_found', 'Draft not found', 404)
+    return jsonify({'success': True, 'code': 'draft_deleted'})
 
 
 # ========================================
@@ -1792,6 +2052,11 @@ def create_effectiveness_rating_v1():
         return jsonify({'success': True, 'pending': True, 'pending_count': pending_count}), 202
 
     try:
+        # One rating per person x answer x profile: rating again replaces the score.
+        replaced = argstore.find_user_rating(
+            store, counter_argument_id=counter_argument_id,
+            persona_archetype_id=persona_id, user_id=current_user.id,
+        ) is not None
         rating = argstore.create_rating(
             store,
             counter_argument_id=counter_argument_id,
@@ -1800,7 +2065,16 @@ def create_effectiveness_rating_v1():
             user_id=current_user.id,
         )
         argstore.save_store(ARGUMENTATION_FILE, store, PERSONA_ARCHETYPES_FILE)
-        return jsonify({'success': True, 'rating': rating}), 201
+        scores = [int(r['score']) for r in argstore.counted_ratings(store)
+                  if r['counter_argument_id'] == counter_argument_id]
+        return jsonify({
+            'success': True,
+            'replaced': replaced,
+            'rating': rating,
+            'my_score': rating['score'],
+            'rating_count': len(scores),
+            'avg_score': (sum(scores) / len(scores)) if scores else None,
+        }), (200 if replaced else 201)
     except ValueError as e:
         return api_error(_value_error_code(e), str(e), 400)
     except Exception as e:
